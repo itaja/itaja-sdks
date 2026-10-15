@@ -35,7 +35,7 @@ import {
   type AnyItajaEvent,
 } from "../src/index.js";
 
-const vectors = JSON.parse(readFileSync(new URL("./fixtures/signature-vectors.json", import.meta.url), "utf8")) as {
+const vectors = JSON.parse(readFileSync(new URL("../../../spec/signature-vectors.json", import.meta.url), "utf8")) as {
   secret: string;
   vectors: Array<{ name: string; timestamp: string; body: string; signature: string }>;
 };

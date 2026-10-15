@@ -10,7 +10,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/itaja/itaja-node.git"
+    "url": "git+https://github.com/itaja/itaja-sdks.git",
+    "directory": "packages/node"
   },
   "keywords": [
     "itaja",
@@ -50,8 +51,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "generate": "openapi-typescript spec/openapi.json -o src/generated/openapi.ts",
-    "generate:check": "openapi-typescript spec/openapi.json -o src/generated/openapi.ts --check"
+    "generate": "openapi-typescript ../../spec/openapi.json -o src/generated/openapi.ts",
+    "generate:check": "openapi-typescript ../../spec/openapi.json -o src/generated/openapi.ts --check",
+    "prepack": "cp ../../LICENSE LICENSE"
   },
   "dependencies": {
     "axios": "^1.20.0",

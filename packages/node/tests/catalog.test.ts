@@ -34,7 +34,7 @@ import {
   type CreditsIdOf,
 } from "../src/index.js";
 
-const schema = JSON.parse(readFileSync(new URL("../spec/catalog.schema.json", import.meta.url), "utf8"));
+const schema = JSON.parse(readFileSync(new URL("../../../spec/catalog.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv2020.default({ allErrors: true, strict: false });
 ajv.addFormat("integer", true);
 const validate = ajv.compile(schema);
