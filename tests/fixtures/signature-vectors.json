@@ -1,0 +1,24 @@
+{
+  "secret": "whsec_conformance_not_a_real_secret",
+  "generatedBy": "itaja-services backend/packages/application signOutboundWebhook @ 5e12c5a1",
+  "vectors": [
+    {
+      "name": "checkout.paid",
+      "timestamp": "1760500000",
+      "body": "{\"id\":\"itaja_evt_txn_1\",\"type\":\"checkout.paid\",\"apiVersion\":\"v1\",\"mode\":\"live\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"checkoutId\":\"chk_1\",\"productId\":null,\"transactionId\":\"txn_1\",\"amount\":5000,\"currency\":\"XOF\",\"paidAt\":\"2026-10-15T10:00:00.000Z\"}}",
+      "signature": "v1,/DKF56v9CyvZGb/uweNHNEWG/Dv46EMitfFkqhbN+Ok="
+    },
+    {
+      "name": "unicode body",
+      "timestamp": "1760500001",
+      "body": "{\"id\":\"itaja_evt_2\",\"type\":\"license.activated\",\"apiVersion\":\"v1\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_1\",\"keyId\":\"key_1\",\"key\":\"ITJ-••••-••••-ABCD\",\"instanceId\":\"i1\",\"label\":\"Ordinateur d'Awa — été\",\"activationsUsed\":1,\"activationsMax\":3,\"expiresAt\":null,\"deviceFingerprintHash\":\"sha256:x\"}}",
+      "signature": "v1,jXPirOyIT6GfvUAs/SuQb0Z4q49SRkTY56H3t1X8iNg="
+    },
+    {
+      "name": "sandbox credits.low",
+      "timestamp": "1760500002",
+      "body": "{\"id\":\"itaja_evt_3\",\"type\":\"credits.low\",\"apiVersion\":\"v1\",\"mode\":\"sandbox\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_2\",\"walletId\":\"cwl_1\",\"customerId\":\"cus_1\",\"balance\":10,\"threshold\":20,\"idempotencyKey\":\"k\"}}",
+      "signature": "v1,exv9vPoD2zNhFG4Kg10qKC/mrN0Dt2nmmj1Cm3WQgJ0="
+    }
+  ]
+}

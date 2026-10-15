@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getitaja.com/schemas/catalog.schema.json",
+  "title": "Itaja catalogue",
+  "description": "A merchant's catalogue declared in code: features, and products (subscription groups and their plans, credit packs, licences, one-off offers). Pushed with PUT /v1/catalog.",
+  "type": "object",
+  "required": [
+    "products"
+  ],
+  "properties": {
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "description": "Your own identifier for this item. Unique within its kind.",
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": "boolean",
+                "type": "string"
+              },
+              {
+                "const": "metered",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "plans"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                "description": "Your own identifier for this item. Unique within its kind.",
+                "type": "string"
+              },
+              "name": {
+                "minLength": 1,
+                "maxLength": 200,
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "subscription",
+                "type": "string"
+              },
+              "plans": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                      "description": "Your own identifier for this item. Unique within its kind.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "maxLength": 2000,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "price": {
+                      "type": "object",
+                      "required": [
+                        "amount",
+                        "currency",
+                        "interval"
+                      ],
+                      "properties": {
+                        "amount": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "currency": {
+                          "minLength": 3,
+                          "maxLength": 3,
+                          "type": "string"
+                        },
+                        "interval": {
+                          "anyOf": [
+                            {
+                              "const": "week",
+                              "type": "string"
+                            },
+                            {
+                              "const": "month",
+                              "type": "string"
+                            },
+                            {
+                              "const": "quarter",
+                              "type": "string"
+                            },
+                            {
+                              "const": "year",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "intervalCount": {
+                          "minimum": 1,
+                          "maximum": 12,
+                          "anyOf": [
+                            {
+                              "format": "integer",
+                              "default": 0,
+                              "type": "string"
+                            },
+                            {
+                              "minimum": 1,
+                              "maximum": 12,
+                              "type": "integer"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "trial": {
+                      "type": "object",
+                      "required": [
+                        "days"
+                      ],
+                      "properties": {
+                        "days": {
+                          "minimum": 0,
+                          "maximum": 365,
+                          "anyOf": [
+                            {
+                              "format": "integer",
+                              "default": 0,
+                              "type": "string"
+                            },
+                            {
+                              "minimum": 0,
+                              "maximum": 365,
+                              "type": "integer"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "default": {
+                      "type": "boolean"
+                    },
+                    "includes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "feature"
+                        ],
+                        "properties": {
+                          "feature": {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                            "description": "Your own identifier for this item. Unique within its kind.",
+                            "type": "string"
+                          },
+                          "limit": {
+                            "minimum": 0,
+                            "description": "Quota per period — `metered` features only.",
+                            "anyOf": [
+                              {
+                                "format": "integer",
+                                "default": 0,
+                                "type": "string"
+                              },
+                              {
+                                "minimum": 0,
+                                "description": "Quota per period — `metered` features only.",
+                                "type": "integer"
+                              }
+                            ]
+                          },
+                          "reset": {
+                            "description": "When the quota resets — `metered` features only. Defaults to the plan's interval.",
+                            "anyOf": [
+                              {
+                                "const": "day",
+                                "type": "string"
+                              },
+                              {
+                                "const": "week",
+                                "type": "string"
+                              },
+                              {
+                                "const": "month",
+                                "type": "string"
+                              },
+                              {
+                                "const": "year",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "packs"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                "description": "Your own identifier for this item. Unique within its kind.",
+                "type": "string"
+              },
+              "name": {
+                "minLength": 1,
+                "maxLength": 200,
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "credits",
+                "type": "string"
+              },
+              "coinName": {
+                "minLength": 1,
+                "maxLength": 60,
+                "type": "string"
+              },
+              "packs": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "label",
+                    "credits",
+                    "price"
+                  ],
+                  "properties": {
+                    "id": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                      "description": "Your own identifier for this item. Unique within its kind.",
+                      "type": "string"
+                    },
+                    "label": {
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "type": "string"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "maxLength": 2000,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "credits": {
+                      "minimum": 1,
+                      "anyOf": [
+                        {
+                          "format": "integer",
+                          "default": 0,
+                          "type": "string"
+                        },
+                        {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      ]
+                    },
+                    "price": {
+                      "type": "object",
+                      "required": [
+                        "amount",
+                        "currency"
+                      ],
+                      "properties": {
+                        "amount": {
+                          "exclusiveMinimum": 0,
+                          "description": "In major units of `currency`.",
+                          "type": "number"
+                        },
+                        "currency": {
+                          "minLength": 3,
+                          "maxLength": 3,
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "price",
+              "devices"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                "description": "Your own identifier for this item. Unique within its kind.",
+                "type": "string"
+              },
+              "name": {
+                "minLength": 1,
+                "maxLength": 200,
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "license",
+                "type": "string"
+              },
+              "price": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "properties": {
+                  "amount": {
+                    "exclusiveMinimum": 0,
+                    "description": "In major units of `currency`.",
+                    "type": "number"
+                  },
+                  "currency": {
+                    "minLength": 3,
+                    "maxLength": 3,
+                    "type": "string"
+                  }
+                }
+              },
+              "devices": {
+                "anyOf": [
+                  {
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "anyOf": [
+                      {
+                        "format": "integer",
+                        "default": 0,
+                        "type": "string"
+                      },
+                      {
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "duration": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "price"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+                "description": "Your own identifier for this item. Unique within its kind.",
+                "type": "string"
+              },
+              "name": {
+                "minLength": 1,
+                "maxLength": 200,
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "offer",
+                "type": "string"
+              },
+              "price": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "properties": {
+                  "amount": {
+                    "exclusiveMinimum": 0,
+                    "description": "In major units of `currency`.",
+                    "type": "number"
+                  },
+                  "currency": {
+                    "minLength": 3,
+                    "maxLength": 3,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

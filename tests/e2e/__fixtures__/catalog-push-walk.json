@@ -1,0 +1,154 @@
+[
+  {
+    "step": "first push",
+    "changes": [
+      {
+        "kind": "feature",
+        "key": "messages-<run>",
+        "product": null,
+        "action": "created",
+        "version": null
+      },
+      {
+        "kind": "pack",
+        "key": "small",
+        "product": "tokens-<run>",
+        "action": "created",
+        "version": null
+      },
+      {
+        "kind": "plan",
+        "key": "free",
+        "product": "app-<run>",
+        "action": "created",
+        "version": 1
+      },
+      {
+        "kind": "plan",
+        "key": "pro",
+        "product": "app-<run>",
+        "action": "created",
+        "version": 1
+      },
+      {
+        "kind": "product",
+        "key": "app-<run>",
+        "product": null,
+        "action": "created",
+        "version": null
+      },
+      {
+        "kind": "product",
+        "key": "ebook-<run>",
+        "product": null,
+        "action": "created",
+        "version": null
+      },
+      {
+        "kind": "product",
+        "key": "tokens-<run>",
+        "product": null,
+        "action": "created",
+        "version": null
+      }
+    ]
+  },
+  {
+    "step": "same catalogue again",
+    "changes": [
+      {
+        "kind": "feature",
+        "key": "messages-<run>",
+        "product": null,
+        "action": "unchanged",
+        "version": null
+      },
+      {
+        "kind": "pack",
+        "key": "small",
+        "product": "tokens-<run>",
+        "action": "unchanged",
+        "version": null
+      },
+      {
+        "kind": "plan",
+        "key": "free",
+        "product": "app-<run>",
+        "action": "unchanged",
+        "version": 1
+      },
+      {
+        "kind": "plan",
+        "key": "pro",
+        "product": "app-<run>",
+        "action": "unchanged",
+        "version": 1
+      },
+      {
+        "kind": "product",
+        "key": "app-<run>",
+        "product": null,
+        "action": "unchanged",
+        "version": null
+      },
+      {
+        "kind": "product",
+        "key": "ebook-<run>",
+        "product": null,
+        "action": "unchanged",
+        "version": null
+      },
+      {
+        "kind": "product",
+        "key": "tokens-<run>",
+        "product": null,
+        "action": "unchanged",
+        "version": null
+      }
+    ]
+  },
+  {
+    "step": "pro repriced",
+    "changes": [
+      {
+        "kind": "plan",
+        "key": "pro",
+        "product": "app-<run>",
+        "action": "changed",
+        "version": 2
+      }
+    ]
+  },
+  {
+    "step": "packs of the pushed credits",
+    "packs": [
+      {
+        "label": "100 Tokens",
+        "coins": 100,
+        "amount": 1000,
+        "currency": "XOF"
+      }
+    ]
+  },
+  {
+    "step": "push replayed under one key, then reused on another catalogue",
+    "replayEqual": true,
+    "reused": "IDEMPOTENCY_KEY_REUSED"
+  },
+  {
+    "step": "customer read with an account key",
+    "error": "ItajaPermissionError",
+    "status": 403,
+    "code": "PRODUCT_SCOPE_VIOLATION"
+  },
+  {
+    "step": "unknown subscription",
+    "error": "ItajaNotFoundError",
+    "status": 404,
+    "code": "SUBSCRIPTION_NOT_FOUND"
+  },
+  {
+    "step": "product never pushed",
+    "code": "CATALOG_PRODUCT_NOT_PUSHED"
+  }
+]
