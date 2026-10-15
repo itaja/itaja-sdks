@@ -20,20 +20,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [18, 20, 22]
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: packages/node/package.json
+      # pnpm 11 itself needs Node >= 22.13: install and build with 22…
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: pnpm
           cache-dependency-path: packages/node/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       # The generated types must match spec/openapi.json.
       - run: pnpm generate:check
       - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm build
+      # …then run the suite and the built package on the Node the matrix targets.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version && ./node_modules/.bin/vitest run
+      - run: node dist/cli.js help
