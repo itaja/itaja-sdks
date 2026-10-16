@@ -1,7 +1,7 @@
 export { createItaja } from "./client.js";
 export type { Itaja, ItajaOptions, ProductRef, PushResult, WriteOptions } from "./client.js";
 
-export { feature, group, plan, credits, creditPack, license, offer, toCatalogDocument } from "./catalog.js";
+export { feature, group, plan, credits, creditPack, license, toCatalogDocument } from "./catalog.js";
 export type {
   BooleanFeature,
   CatalogDocument,
@@ -18,8 +18,6 @@ export type {
   LicenseIdOf,
   MeteredFeature,
   Money,
-  Offer,
-  OfferIdOf,
   Plan,
   PlanIdOf,
   ProductIdOf,

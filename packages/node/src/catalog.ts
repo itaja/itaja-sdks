@@ -183,7 +183,7 @@ export function creditPack<const Id extends string, const C extends string>(inpu
   };
 }
 
-// ── Licences and one-off offers ─────────────────────────────────────────────
+// ── Licences ─────────────────────────────────────────────
 
 export type LicenseDuration = "lifetime" | `days-${number}` | `from-first-activation-days-${number}`;
 
@@ -211,34 +211,15 @@ export function license<const Id extends string>(input: {
   return { kind: "license", ...input };
 }
 
-export interface Offer<Id extends string = string> {
-  readonly kind: "offer";
-  readonly id: Id;
-  readonly name: string;
-  readonly description?: string | null;
-  readonly price: Money;
-}
-
-/** A one-off sale at a fixed price, sold through the product's payment link. */
-export function offer<const Id extends string>(input: {
-  id: Id;
-  name: string;
-  description?: string | null;
-  price: Money;
-}): Offer<Id> {
-  assertId(input.id, "offer");
-  return { kind: "offer", ...input };
-}
-
 // ── The catalogue ───────────────────────────────────────────────────────────
 
-/** What `catalog` accepts: plans, credit packs, licences, offers — and features or credits on their own. */
-export type CatalogItem = Plan | CreditPack | License | Offer | Credits | Feature;
+/** What `catalog` accepts: plans, credit packs, licences — and features or credits on their own. */
+export type CatalogItem = Plan | CreditPack | License | Credits | Feature;
 
 /** The canonical document `PUT /v1/catalog` takes (`spec/catalog.schema.json`). */
 export interface CatalogDocument {
   features: Array<{ id: string; type: "boolean" | "metered" }>;
-  products: Array<Record<string, unknown> & { id: string; type: "subscription" | "credits" | "license" | "offer" }>;
+  products: Array<Record<string, unknown> & { id: string; type: "subscription" | "credits" | "license" }>;
 }
 
 /**
@@ -305,8 +286,7 @@ export function toCatalogDocument(items: readonly CatalogItem[]): CatalogDocumen
         }
         break;
       }
-      case "license":
-      case "offer": {
+      case "license": {
         if (seen("single", item.id)) throw duplicateProduct(item.id);
         const { kind, ...rest } = item;
         products.set(`single:${item.id}`, { ...rest, type: kind } as CatalogDocument["products"][number]);
@@ -382,14 +362,11 @@ export type CreditsIdOf<C extends Items> =
   | Extract<C[number], CreditPack>["of"]["id"];
 /** The licence ids of a catalogue. */
 export type LicenseIdOf<C extends Items> = Extract<C[number], License>["id"];
-/** The offer ids of a catalogue. */
-export type OfferIdOf<C extends Items> = Extract<C[number], Offer>["id"];
-/** Every product id — groups, credits, licences, offers. */
+/** Every product id — groups, credits, licences. */
 export type ProductIdOf<C extends Items> =
   | Extract<C[number], Plan>["group"]["id"]
   | CreditsIdOf<C>
-  | LicenseIdOf<C>
-  | OfferIdOf<C>;
+  | LicenseIdOf<C>;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -409,7 +386,7 @@ function humanize(id: string): string {
 }
 
 function duplicateProduct(id: string): ItajaConfigError {
-  return configError(`Product id "${id}" is used twice in the catalogue (groups, credits, licences and offers share one id space).`);
+  return configError(`Product id "${id}" is used twice in the catalogue (groups, credits and licences share one id space).`);
 }
 
 function configError(message: string): ItajaConfigError {

@@ -43,7 +43,7 @@ export interface paths {
         put?: never;
         /**
          * Create product
-         * @description **In short:** Create something to sell, and choose once and for all how it is sold: payment link, subscription, credits or license keys.
+         * @description **In short:** Create something to sell, and choose once and for all how it is sold: one-off purchase, subscription, credits or license keys.
          *
          *     Creates a product owned by the account behind the API key. The monetization mode is mandatory and immutable.
          */
@@ -1058,7 +1058,7 @@ export interface paths {
         get?: never;
         /**
          * Push the catalogue
-         * @description **In short:** Send the whole catalogue you declare in code — features, subscription plans, credit packs, licences and one-off offers — and Itaja makes its own match it. Add `?dryRun=true` to see what would change without changing anything.
+         * @description **In short:** Send the whole catalogue you declare in code — features, subscription plans, credit packs and licences — and Itaja makes its own match it. Add `?dryRun=true` to see what would change without changing anything.
          *
          *     Each item is named by **your** `id`. Items that are new are `created`; items that differ are `changed`; items you no longer declare are `archived` (taken off sale, never deleted — running contracts keep going); the rest is `unchanged`. Pushing the same catalogue twice changes nothing the second time.
          *
@@ -1124,8 +1124,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1140,6 +1138,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         }[];
                     };
                 };
@@ -1160,15 +1160,10 @@ export interface operations {
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
-                    amount?: number | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     metadata?: {
                         [key: string]: unknown;
                     } | null;
@@ -1176,21 +1171,20 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
+                } & {
+                    [key: string]: unknown;
                 };
                 "application/x-www-form-urlencoded": {
                     name: string;
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
-                    amount?: number | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     metadata?: {
                         [key: string]: unknown;
                     } | null;
@@ -1198,21 +1192,20 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
+                } & {
+                    [key: string]: unknown;
                 };
                 "multipart/form-data": {
                     name: string;
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
-                    amount?: number | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     metadata?: {
                         [key: string]: unknown;
                     } | null;
@@ -1220,6 +1213,10 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
+                } & {
+                    [key: string]: unknown;
                 };
             };
         };
@@ -1241,8 +1238,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1257,6 +1252,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1342,8 +1339,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1358,6 +1353,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1401,9 +1398,9 @@ export interface operations {
                     } | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     portalActivation?: boolean;
+                } & {
+                    [key: string]: unknown;
                 };
                 "application/x-www-form-urlencoded": {
                     name?: string;
@@ -1414,9 +1411,9 @@ export interface operations {
                     } | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     portalActivation?: boolean;
+                } & {
+                    [key: string]: unknown;
                 };
                 "multipart/form-data": {
                     name?: string;
@@ -1427,9 +1424,9 @@ export interface operations {
                     } | null;
                     /** @enum {string} */
                     status?: "DRAFT" | "ACTIVE";
-                    creditCoinName?: string | null;
-                    creditForm?: ("bundle" | "subscription" | "hybrid") | null;
                     portalActivation?: boolean;
+                } & {
+                    [key: string]: unknown;
                 };
             };
         };
@@ -1451,8 +1448,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1467,6 +1462,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1535,8 +1532,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1551,6 +1546,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -7585,18 +7582,6 @@ export interface operations {
                         };
                         devices: number | null;
                         duration?: string;
-                    } | {
-                        /** @description Your own identifier for this item. Unique within its kind. */
-                        id: string;
-                        name: string;
-                        description?: string | null;
-                        /** @constant */
-                        type: "offer";
-                        price: {
-                            /** @description In major units of `currency`. */
-                            amount: number;
-                            currency: string;
-                        };
                     })[];
                 };
                 "application/x-www-form-urlencoded": {
@@ -7671,18 +7656,6 @@ export interface operations {
                         };
                         devices: number | null;
                         duration?: string;
-                    } | {
-                        /** @description Your own identifier for this item. Unique within its kind. */
-                        id: string;
-                        name: string;
-                        description?: string | null;
-                        /** @constant */
-                        type: "offer";
-                        price: {
-                            /** @description In major units of `currency`. */
-                            amount: number;
-                            currency: string;
-                        };
                     })[];
                 };
                 "multipart/form-data": {
@@ -7757,18 +7730,6 @@ export interface operations {
                         };
                         devices: number | null;
                         duration?: string;
-                    } | {
-                        /** @description Your own identifier for this item. Unique within its kind. */
-                        id: string;
-                        name: string;
-                        description?: string | null;
-                        /** @constant */
-                        type: "offer";
-                        price: {
-                            /** @description In major units of `currency`. */
-                            amount: number;
-                            currency: string;
-                        };
                     })[];
                 };
             };

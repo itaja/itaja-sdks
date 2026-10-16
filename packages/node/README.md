@@ -16,7 +16,7 @@ pnpm add @itaja/node        # npm i @itaja/node · bun add @itaja/node
 
 ```ts
 // itaja.config.ts
-import { createItaja, creditPack, credits, feature, group, license, offer, plan } from "@itaja/node";
+import { createItaja, creditPack, credits, feature, group, license, plan } from "@itaja/node";
 
 export const messages = feature({ id: "messages", type: "metered" });
 export const exportCsv = feature({ id: "export", type: "boolean" });
@@ -34,11 +34,9 @@ export const small = creditPack({ id: "small", of: tokens, credits: 100,
 
 export const desktop = license({ id: "desktop", name: "Desktop app", devices: 3,
   duration: "days-365", price: { amount: 25000, currency: "XOF" } });
-export const ebook = offer({ id: "ebook", name: "The guide",
-  price: { amount: 3000, currency: "XOF" } });
 
 export const itaja = createItaja({
-  catalog: [messages, exportCsv, free, pro, small, desktop, ebook],
+  catalog: [messages, exportCsv, free, pro, small, desktop],
   on: {
     "checkout.paid": ({ data }) => fulfil(data.checkoutId),
     "credits.low": ({ data }) => remind(data.customerId, data.balance),
@@ -53,7 +51,9 @@ export default itaja;
 | `group({ id, name })` + `plan({ id, group, price?, trial?, default?, includes })` | subscription | a subscription product and its plans; a customer holds one plan per group; `default` is the free fallback |
 | `credits({ id, name, coinName? })` + `creditPack({ id, of, credits, price })` | credits | a credit currency and the packs that sell it |
 | `license({ id, name, devices, duration?, price })` | licence key | software unlocked on N devices |
-| `offer({ id, name, price })` | payment link | a one-off sale |
+
+Payment links are a dashboard feature: no builder, endpoint or option here creates
+or prices one. A one-off sale is a `license` (or a credit pack).
 
 Ids are **yours** and are inferred as literal types. Amounts are in **major
 units** of their currency (`5000` XOF, `9.99` EUR), as in the API. Mistakes the

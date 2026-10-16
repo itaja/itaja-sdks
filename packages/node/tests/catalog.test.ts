@@ -27,7 +27,6 @@ import {
   feature,
   group,
   license,
-  offer,
   plan,
   toCatalogDocument,
   type PlanIdOf,
@@ -54,8 +53,7 @@ function declare() {
   const tokens = credits({ id: "tokens", name: "AI tokens", coinName: "Tokens" });
   const small = creditPack({ id: "small", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
   const desktop = license({ id: "desktop", name: "Desktop app", devices: 3, duration: "days-365", price: { amount: 25000, currency: "XOF" } });
-  const ebook = offer({ id: "ebook", name: "The guide", price: { amount: 3000, currency: "XOF" } });
-  return [messages, exportCsv, free, pro, small, desktop, ebook] as const;
+  return [messages, exportCsv, free, pro, small, desktop] as const;
 }
 
 const configError = (fn: () => unknown) => {
@@ -159,15 +157,6 @@ describe("toCatalogDocument", () => {
             },
             "type": "license",
           },
-          {
-            "id": "ebook",
-            "name": "The guide",
-            "price": {
-              "amount": 3000,
-              "currency": "XOF",
-            },
-            "type": "offer",
-          },
         ],
       }
     `);
@@ -195,7 +184,7 @@ describe("toCatalogDocument", () => {
     ).toContain("two default plans");
     expect(configError(() => toCatalogDocument([credits({ id: "c", name: "C" })]))).toContain("no pack");
     expect(
-      configError(() => toCatalogDocument([offer({ id: "x", name: "X", price: { amount: 1, currency: "XOF" } }), plan({ id: "p", group: "x", default: true })])),
+      configError(() => toCatalogDocument([license({ id: "x", name: "X", devices: 1, price: { amount: 1, currency: "XOF" } }), plan({ id: "p", group: "x", default: true })])),
     ).toContain("used twice");
   });
 
