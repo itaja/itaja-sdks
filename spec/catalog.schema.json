@@ -437,61 +437,6 @@
                 "type": "string"
               }
             }
-          },
-          {
-            "type": "object",
-            "required": [
-              "id",
-              "name",
-              "type",
-              "price"
-            ],
-            "properties": {
-              "id": {
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                "description": "Your own identifier for this item. Unique within its kind.",
-                "type": "string"
-              },
-              "name": {
-                "minLength": 1,
-                "maxLength": 200,
-                "type": "string"
-              },
-              "description": {
-                "anyOf": [
-                  {
-                    "maxLength": 2000,
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "type": {
-                "const": "offer",
-                "type": "string"
-              },
-              "price": {
-                "type": "object",
-                "required": [
-                  "amount",
-                  "currency"
-                ],
-                "properties": {
-                  "amount": {
-                    "exclusiveMinimum": 0,
-                    "description": "In major units of `currency`.",
-                    "type": "number"
-                  },
-                  "currency": {
-                    "minLength": 3,
-                    "maxLength": 3,
-                    "type": "string"
-                  }
-                }
-              }
-            }
           }
         ]
       }

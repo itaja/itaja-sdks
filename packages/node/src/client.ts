@@ -32,7 +32,7 @@ import {
 import { type KeyMode, Transport, type TransportOptions } from "./transport.js";
 
 export interface ItajaOptions<C extends readonly CatalogItem[]> {
-  /** What you sell, declared with `plan`, `creditPack`, `license`, `offer`, `feature`. */
+  /** What you sell, declared with `plan`, `creditPack`, `license`, `feature`. */
   catalog?: C;
   /** Defaults to `process.env.ITAJA_API_KEY`. Server-side only. */
   apiKey?: string;

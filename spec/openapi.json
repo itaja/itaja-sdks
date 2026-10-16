@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Itaja Developers API",
-    "description": "The Itaja API lets your own systems do what the Itaja dashboard does: create what you sell, register buyers, take payments, and manage what buyers get afterwards — subscriptions, credits, license keys.\n\n## Base URL\n\n| Environment | Base URL |\n|---|---|\n| Production | `https://api.getitaja.com/api/v1` |\n| Development | `https://api-dev.getitaja.com/api/v1` |\n\n## Authentication\n\nSend your API key in the `x-itj-key` header. Keep it on your server: anyone holding it acts as you.\n\n- **Sandbox or live.** A key starting with `itjs_` is a *sandbox* key: nothing is really charged, and it only sees sandbox products. A key starting with `itjp_` is *live*: real money, live products only. The two worlds never mix — a sandbox key cannot read nor touch a live product, a live subscriber or a live wallet.\n- **Whole account or one product.** A key can cover your whole account, or be limited to a single product. A product key cannot reach another product (`403 PRODUCT_SCOPE_VIOLATION`).\n- A handful of endpoints take **no API key** because they are called from your buyer's device or your shipped software (marked *public* below). They are protected by what the caller holds instead — a license key, or a short-lived signed token your server issued — and they are rate-limited.\n\n## Responses\n\nEvery answer has the same shape: `{ \"success\": true, \"data\": … }` on success, `{ \"success\": false, \"error\": \"…\", \"code\": \"…\" }` on failure. `error` is for humans, `code` is stable and meant for your code. Something that does not exist and something you are not allowed to see answer the same `404`: the API never reveals what belongs to someone else.\n\n## How you sell: the four modes\n\nEvery product is sold in exactly one way, chosen when the product is created and never changed afterwards:\n\n| Mode | What the buyer gets | Endpoints you will use |\n|---|---|---|\n| `PAYLINK` | A one-off purchase through a payment link | **Products**, **Checkout** |\n| `SUBSCRIPTION` | Access billed every week, month, quarter or year | **Products**, **Subscriptions** |\n| `CREDITS` | A balance of credits (coins) spent as they use your service | **Products**, **Credits**, **Credits (public)** |\n| `LICENSE` | A license key that unlocks your software on a number of devices | **Products**, **Licenses**, **Licenses (public)**, **Licenses (retrieval)** |\n\nAn endpoint of another mode answers `409 MONETIZATION_MODE_MISMATCH`.\n\n## Which endpoint should I use?\n\nSome endpoints look alike. The difference, in one line each:\n\n- **Selling — Checkout vs. credit pack checkout.** `POST /checkout-sessions` sells a cart *you* price (your line items, your amounts). `POST /products/{productId}/credit-packs/{packId}/checkout` sells a credit bundle priced *by Itaja* (you never send an amount).\n- **Credits — wallet vs. balance.** `GET …/credits/{customerId}` returns the balance *and* every movement (for a statement or support). `GET …/credits/{customerId}/balance` returns only the number, and `0` for a buyer who never bought (for showing a counter).\n- **Credits — server vs. buyer's device.** `POST …/credits/consume` is called by your server with your API key. `POST /public/credits/consume` is called by the buyer's browser or app with a 15-minute token your server issued (`…/wallet-token`) — your key never leaves your server.\n- **Credits — expire one vs. expire all.** `…/credits/expire` clears one buyer's expired credits; `…/credits/expire-due` clears every buyer of the product. Itaja already runs the second every day.\n- **Licenses — suspend, revoke, rotate, resend.** *Suspend* blocks a key for a while and can be undone (*resume*). *Revoke* kills it for good. *Rotate* replaces a leaked key with a new one (devices must activate again). *Resend* emails the same key again to a buyer who lost it — nothing changes.\n- **Licenses — managing vs. checking.** The **Licenses** endpoints are for you (issue, list, revoke…), with your API key. The **Licenses (public)** endpoints are for the software you ship (verify, activate, deactivate), with the buyer's license key only.\n- **Subscriptions — cancel vs. pause.** *Cancel* ends the subscription, at the end of the paid period by default or right away with `immediately: true`. *Pause* freezes it (no renewal, no invoice) until you *resume* it, without losing paid days.\n- **There is no \"create a subscription\" endpoint**, on purpose: a subscription starts when the buyer pays its first period on the product's link.\n\nCategories and endpoints are listed in alphabetical order.",
+    "description": "The Itaja API lets your own systems do what the Itaja dashboard does: create what you sell, register buyers, take payments, and manage what buyers get afterwards — subscriptions, credits, license keys.\n\n## Base URL\n\n| Environment | Base URL |\n|---|---|\n| Production | `https://api.getitaja.com/api/v1` |\n| Development | `https://api-dev.getitaja.com/api/v1` |\n\n## Authentication\n\nSend your API key in the `x-itj-key` header. Keep it on your server: anyone holding it acts as you.\n\n- **Sandbox or live.** A key starting with `itjs_` is a *sandbox* key: nothing is really charged, and it only sees sandbox products. A key starting with `itjp_` is *live*: real money, live products only. The two worlds never mix — a sandbox key cannot read nor touch a live product, a live subscriber or a live wallet.\n- **Whole account or one product.** A key can cover your whole account, or be limited to a single product. A product key cannot reach another product (`403 PRODUCT_SCOPE_VIOLATION`).\n- A handful of endpoints take **no API key** because they are called from your buyer's device or your shipped software (marked *public* below). They are protected by what the caller holds instead — a license key, or a short-lived signed token your server issued — and they are rate-limited.\n\n## Responses\n\nEvery answer has the same shape: `{ \"success\": true, \"data\": … }` on success, `{ \"success\": false, \"error\": \"…\", \"code\": \"…\" }` on failure. `error` is for humans, `code` is stable and meant for your code. Something that does not exist and something you are not allowed to see answer the same `404`: the API never reveals what belongs to someone else.\n\n## How you sell: the four modes\n\nEvery product is sold in exactly one way, chosen when the product is created and never changed afterwards:\n\n| Mode | What the buyer gets | Endpoints you will use |\n|---|---|---|\n| `PAYLINK` | A one-off purchase | **Products**, **Checkout** |\n| `SUBSCRIPTION` | Access billed every week, month, quarter or year | **Products**, **Subscriptions** |\n| `CREDITS` | A balance of credits (coins) spent as they use your service | **Products**, **Credits**, **Credits (public)** |\n| `LICENSE` | A license key that unlocks your software on a number of devices | **Products**, **Licenses**, **Licenses (public)**, **Licenses (retrieval)** |\n\nAn endpoint of another mode answers `409 MONETIZATION_MODE_MISMATCH`.\n\n## Which endpoint should I use?\n\nSome endpoints look alike. The difference, in one line each:\n\n- **Selling — Checkout vs. credit pack checkout.** `POST /checkout-sessions` sells a cart *you* price (your line items, your amounts). `POST /products/{productId}/credit-packs/{packId}/checkout` sells a credit bundle priced *by Itaja* (you never send an amount).\n- **Credits — wallet vs. balance.** `GET …/credits/{customerId}` returns the balance *and* every movement (for a statement or support). `GET …/credits/{customerId}/balance` returns only the number, and `0` for a buyer who never bought (for showing a counter).\n- **Credits — server vs. buyer's device.** `POST …/credits/consume` is called by your server with your API key. `POST /public/credits/consume` is called by the buyer's browser or app with a 15-minute token your server issued (`…/wallet-token`) — your key never leaves your server.\n- **Credits — expire one vs. expire all.** `…/credits/expire` clears one buyer's expired credits; `…/credits/expire-due` clears every buyer of the product. Itaja already runs the second every day.\n- **Licenses — suspend, revoke, rotate, resend.** *Suspend* blocks a key for a while and can be undone (*resume*). *Revoke* kills it for good. *Rotate* replaces a leaked key with a new one (devices must activate again). *Resend* emails the same key again to a buyer who lost it — nothing changes.\n- **Licenses — managing vs. checking.** The **Licenses** endpoints are for you (issue, list, revoke…), with your API key. The **Licenses (public)** endpoints are for the software you ship (verify, activate, deactivate), with the buyer's license key only.\n- **Subscriptions — cancel vs. pause.** *Cancel* ends the subscription, at the end of the paid period by default or right away with `immediately: true`. *Pause* freezes it (no renewal, no invoice) until you *resume* it, without losing paid days.\n- **There is no \"create a subscription\" endpoint**, on purpose: a subscription starts when the buyer pays its first period on the product's link.\n\nCategories and endpoints are listed in alphabetical order.",
     "version": "1.0.0"
   },
   "servers": [
@@ -58,7 +58,7 @@
     },
     {
       "name": "Products",
-      "description": "What you sell. A product carries its name, its currency and **its mode** — payment link, subscription, credits or license keys — fixed at creation. Create, list, read, update and archive products. Called by your server."
+      "description": "What you sell. A product carries its name, its currency and **its mode** — one-off purchase, subscription, credits or license keys — fixed at creation. Create, list, read, update and archive products. Called by your server."
     },
     {
       "name": "Quotes",
@@ -99,7 +99,7 @@
     },
     "/api/v1/products": {
       "post": {
-        "description": "**In short:** Create something to sell, and choose once and for all how it is sold: payment link, subscription, credits or license keys.\n\nCreates a product owned by the account behind the API key. The monetization mode is mandatory and immutable.",
+        "description": "**In short:** Create something to sell, and choose once and for all how it is sold: one-off purchase, subscription, credits or license keys.\n\nCreates a product owned by the account behind the API key. The monetization mode is mandatory and immutable.",
         "tags": [
           "Products"
         ],
@@ -154,56 +154,11 @@
                   "currency": {
                     "type": "string"
                   },
-                  "amount": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "status": {
                     "type": "string",
                     "enum": [
                       "DRAFT",
                       "ACTIVE"
-                    ]
-                  },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
                     ]
                   },
                   "metadata": {
@@ -248,7 +203,8 @@
                       "02"
                     ]
                   }
-                }
+                },
+                "additionalProperties": true
               }
             },
             "application/x-www-form-urlencoded": {
@@ -298,56 +254,11 @@
                   "currency": {
                     "type": "string"
                   },
-                  "amount": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "status": {
                     "type": "string",
                     "enum": [
                       "DRAFT",
                       "ACTIVE"
-                    ]
-                  },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
                     ]
                   },
                   "metadata": {
@@ -392,7 +303,8 @@
                       "02"
                     ]
                   }
-                }
+                },
+                "additionalProperties": true
               }
             },
             "multipart/form-data": {
@@ -442,56 +354,11 @@
                   "currency": {
                     "type": "string"
                   },
-                  "amount": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "status": {
                     "type": "string",
                     "enum": [
                       "DRAFT",
                       "ACTIVE"
-                    ]
-                  },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
                     ]
                   },
                   "metadata": {
@@ -536,7 +403,8 @@
                       "02"
                     ]
                   }
-                }
+                },
+                "additionalProperties": true
               }
             }
           }
@@ -1278,45 +1146,11 @@
                       "ACTIVE"
                     ]
                   },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "portalActivation": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": true
               }
             },
             "application/x-www-form-urlencoded": {
@@ -1359,45 +1193,11 @@
                       "ACTIVE"
                     ]
                   },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "portalActivation": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": true
               }
             },
             "multipart/form-data": {
@@ -1440,45 +1240,11 @@
                       "ACTIVE"
                     ]
                   },
-                  "creditCoinName": {
-                    "anyOf": [
-                      {
-                        "minLength": 1,
-                        "maxLength": 40,
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "creditForm": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "const": "bundle",
-                            "type": "string"
-                          },
-                          {
-                            "const": "subscription",
-                            "type": "string"
-                          },
-                          {
-                            "const": "hybrid",
-                            "type": "string"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "portalActivation": {
                     "type": "boolean"
                   }
-                }
+                },
+                "additionalProperties": true
               }
             }
           }
@@ -17406,7 +17172,7 @@
     },
     "/api/v1/catalog": {
       "put": {
-        "description": "**In short:** Send the whole catalogue you declare in code — features, subscription plans, credit packs, licences and one-off offers — and Itaja makes its own match it. Add `?dryRun=true` to see what would change without changing anything.\n\nEach item is named by **your** `id`. Items that are new are `created`; items that differ are `changed`; items you no longer declare are `archived` (taken off sale, never deleted — running contracts keep going); the rest is `unchanged`. Pushing the same catalogue twice changes nothing the second time.\n\nChanging a plan's price, currency, interval or included features creates a **new version** of the plan: new subscriptions take it, existing subscriptions stay on the version they bought. Name, description, trial and `default` change in place.\n\nThe catalogue is the one of the key's mode: a sandbox key pushes the sandbox catalogue, a live key the live one. Products you created in the dashboard, or with `POST /products`, are never changed or archived by a push.",
+        "description": "**In short:** Send the whole catalogue you declare in code — features, subscription plans, credit packs and licences — and Itaja makes its own match it. Add `?dryRun=true` to see what would change without changing anything.\n\nEach item is named by **your** `id`. Items that are new are `created`; items that differ are `changed`; items you no longer declare are `archived` (taken off sale, never deleted — running contracts keep going); the rest is `unchanged`. Pushing the same catalogue twice changes nothing the second time.\n\nChanging a plan's price, currency, interval or included features creates a **new version** of the plan: new subscriptions take it, existing subscriptions stay on the version they bought. Name, description, trial and `default` change in place.\n\nThe catalogue is the one of the key's mode: a sandbox key pushes the sandbox catalogue, a live key the live one. Products you created in the dashboard, or with `POST /products`, are never changed or archived by a push.",
         "tags": [
           "Catalog"
         ],
@@ -17809,61 +17575,6 @@
                               "type": "string"
                             }
                           }
-                        },
-                        {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "name",
-                            "type",
-                            "price"
-                          ],
-                          "properties": {
-                            "id": {
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                              "description": "Your own identifier for this item. Unique within its kind.",
-                              "type": "string"
-                            },
-                            "name": {
-                              "minLength": 1,
-                              "maxLength": 200,
-                              "type": "string"
-                            },
-                            "description": {
-                              "anyOf": [
-                                {
-                                  "maxLength": 2000,
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "type": {
-                              "const": "offer",
-                              "type": "string"
-                            },
-                            "price": {
-                              "type": "object",
-                              "required": [
-                                "amount",
-                                "currency"
-                              ],
-                              "properties": {
-                                "amount": {
-                                  "exclusiveMinimum": 0,
-                                  "description": "In major units of `currency`.",
-                                  "type": "number"
-                                },
-                                "currency": {
-                                  "minLength": 3,
-                                  "maxLength": 3,
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
                         }
                       ]
                     }
@@ -18251,61 +17962,6 @@
                               "type": "string"
                             }
                           }
-                        },
-                        {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "name",
-                            "type",
-                            "price"
-                          ],
-                          "properties": {
-                            "id": {
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                              "description": "Your own identifier for this item. Unique within its kind.",
-                              "type": "string"
-                            },
-                            "name": {
-                              "minLength": 1,
-                              "maxLength": 200,
-                              "type": "string"
-                            },
-                            "description": {
-                              "anyOf": [
-                                {
-                                  "maxLength": 2000,
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "type": {
-                              "const": "offer",
-                              "type": "string"
-                            },
-                            "price": {
-                              "type": "object",
-                              "required": [
-                                "amount",
-                                "currency"
-                              ],
-                              "properties": {
-                                "amount": {
-                                  "exclusiveMinimum": 0,
-                                  "description": "In major units of `currency`.",
-                                  "type": "number"
-                                },
-                                "currency": {
-                                  "minLength": 3,
-                                  "maxLength": 3,
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
                         }
                       ]
                     }
@@ -18691,61 +18347,6 @@
                             },
                             "duration": {
                               "type": "string"
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "name",
-                            "type",
-                            "price"
-                          ],
-                          "properties": {
-                            "id": {
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                              "description": "Your own identifier for this item. Unique within its kind.",
-                              "type": "string"
-                            },
-                            "name": {
-                              "minLength": 1,
-                              "maxLength": 200,
-                              "type": "string"
-                            },
-                            "description": {
-                              "anyOf": [
-                                {
-                                  "maxLength": 2000,
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "type": {
-                              "const": "offer",
-                              "type": "string"
-                            },
-                            "price": {
-                              "type": "object",
-                              "required": [
-                                "amount",
-                                "currency"
-                              ],
-                              "properties": {
-                                "amount": {
-                                  "exclusiveMinimum": 0,
-                                  "description": "In major units of `currency`.",
-                                  "type": "number"
-                                },
-                                "currency": {
-                                  "minLength": 3,
-                                  "maxLength": 3,
-                                  "type": "string"
-                                }
-                              }
                             }
                           }
                         }

@@ -28,7 +28,7 @@ import {
   credits,
   feature,
   group,
-  offer,
+  license,
   plan,
 } from "../../src/index.js";
 
@@ -52,7 +52,7 @@ function declare(proPrice: number) {
   });
   const tokens = credits({ id: id("tokens"), name: "SDK e2e tokens", coinName: "Tokens" });
   const small = creditPack({ id: "small", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
-  const ebook = offer({ id: id("ebook"), name: "SDK e2e guide", price: { amount: 3000, currency: "XOF" } });
+  const ebook = license({ id: id("ebook"), name: "SDK e2e guide", devices: null, price: { amount: 3000, currency: "XOF" } });
   return [messages, free, pro, small, ebook] as const;
 }
 
