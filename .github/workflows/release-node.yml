@@ -1,4 +1,9 @@
-# Publishes @itaja/node on a `node-vX.Y.Z` tag, and only after the full CI passes.
+# Stages @itaja/node on a `node-vX.Y.Z` tag, and only after the full CI passes.
+#
+# npm removes direct publishing with tokens in January 2027: the workflow runs
+# `npm stage publish`, and a maintainer promotes the staged version with 2FA
+# (`npm stage list`, then `npm stage approve <stage-id> --otp <code>`). Nothing
+# reaches the registry without that approval.
 name: release-node
 
 on:
@@ -32,10 +37,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: packages/node/pnpm-lock.yaml
           registry-url: https://registry.npmjs.org
+      # Staged publishing needs npm >= 11.15 (Node 22 ships npm 10).
+      - run: npm install -g npm@^11.15.0 && npm --version
       - run: pnpm install --frozen-lockfile
       - name: Tag matches package.json
         run: test "node-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - run: pnpm build
-      - run: npm publish --provenance --access public
+      - name: Stage the version (a maintainer approves it with 2FA)
+        run: npm stage publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
