@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Itaja Developers API",
-    "description": "The Itaja API lets your own systems do what the Itaja dashboard does: create what you sell, register buyers, take payments, and manage what buyers get afterwards — subscriptions, credits, license keys.\n\n## Base URL\n\n| Environment | Base URL |\n|---|---|\n| Production | `https://api.getitaja.com/api/v1` |\n| Development | `https://api-dev.getitaja.com/api/v1` |\n\n## Authentication\n\nSend your API key in the `x-itj-key` header. Keep it on your server: anyone holding it acts as you.\n\n- **Sandbox or live.** A key starting with `itjs_` is a *sandbox* key: nothing is really charged, and it only sees sandbox products. A key starting with `itjp_` is *live*: real money, live products only. The two worlds never mix — a sandbox key cannot read nor touch a live product, a live subscriber or a live wallet.\n- **Whole account or one product.** A key can cover your whole account, or be limited to a single product. A product key cannot reach another product (`403 PRODUCT_SCOPE_VIOLATION`).\n- A handful of endpoints take **no API key** because they are called from your buyer's device or your shipped software (marked *public* below). They are protected by what the caller holds instead — a license key, or a short-lived signed token your server issued — and they are rate-limited.\n\n## Responses\n\nEvery answer has the same shape: `{ \"success\": true, \"data\": … }` on success, `{ \"success\": false, \"error\": \"…\", \"code\": \"…\" }` on failure. `error` is for humans, `code` is stable and meant for your code. Something that does not exist and something you are not allowed to see answer the same `404`: the API never reveals what belongs to someone else.\n\n## How you sell: the four modes\n\nEvery product is sold in exactly one way, chosen when the product is created and never changed afterwards:\n\n| Mode | What the buyer gets | Endpoints you will use |\n|---|---|---|\n| `PAYLINK` | A one-off purchase | **Products**, **Checkout** |\n| `SUBSCRIPTION` | Access billed every week, month, quarter or year | **Products**, **Subscriptions** |\n| `CREDITS` | A balance of credits (coins) spent as they use your service | **Products**, **Credits**, **Credits (public)** |\n| `LICENSE` | A license key that unlocks your software on a number of devices | **Products**, **Licenses**, **Licenses (public)**, **Licenses (retrieval)** |\n\nAn endpoint of another mode answers `409 MONETIZATION_MODE_MISMATCH`.\n\n## Which endpoint should I use?\n\nSome endpoints look alike. The difference, in one line each:\n\n- **Selling — Checkout vs. credit pack checkout.** `POST /checkout-sessions` sells a cart *you* price (your line items, your amounts). `POST /products/{productId}/credit-packs/{packId}/checkout` sells a credit bundle priced *by Itaja* (you never send an amount).\n- **Credits — wallet vs. balance.** `GET …/credits/{customerId}` returns the balance *and* every movement (for a statement or support). `GET …/credits/{customerId}/balance` returns only the number, and `0` for a buyer who never bought (for showing a counter).\n- **Credits — server vs. buyer's device.** `POST …/credits/consume` is called by your server with your API key. `POST /public/credits/consume` is called by the buyer's browser or app with a 15-minute token your server issued (`…/wallet-token`) — your key never leaves your server.\n- **Credits — expire one vs. expire all.** `…/credits/expire` clears one buyer's expired credits; `…/credits/expire-due` clears every buyer of the product. Itaja already runs the second every day.\n- **Licenses — suspend, revoke, rotate, resend.** *Suspend* blocks a key for a while and can be undone (*resume*). *Revoke* kills it for good. *Rotate* replaces a leaked key with a new one (devices must activate again). *Resend* emails the same key again to a buyer who lost it — nothing changes.\n- **Licenses — managing vs. checking.** The **Licenses** endpoints are for you (issue, list, revoke…), with your API key. The **Licenses (public)** endpoints are for the software you ship (verify, activate, deactivate), with the buyer's license key only.\n- **Subscriptions — cancel vs. pause.** *Cancel* ends the subscription, at the end of the paid period by default or right away with `immediately: true`. *Pause* freezes it (no renewal, no invoice) until you *resume* it, without losing paid days.\n- **There is no \"create a subscription\" endpoint**, on purpose: a subscription starts when the buyer pays its first period on the product's link.\n\nCategories and endpoints are listed in alphabetical order.",
+    "description": "The Itaja API lets your own systems do what the Itaja dashboard does: create what you sell, register buyers, take payments, and manage what buyers get afterwards — subscriptions, credits, license keys.\n\n## Base URL\n\n| Environment | Base URL |\n|---|---|\n| Production | `https://api.getitaja.com/api/v1` |\n| Development | `https://api-dev.getitaja.com/api/v1` |\n\n## Authentication\n\nSend your API key in the `x-itj-key` header. Keep it on your server: anyone holding it acts as you.\n\n- **Sandbox or live.** A key starting with `itjs_` is a *sandbox* key: nothing is really charged, and it only sees sandbox products. A key starting with `itjp_` is *live*: real money, live products only. The two worlds never mix — a sandbox key cannot read nor touch a live product, a live subscriber or a live wallet.\n- **Whole account or one product.** A key can cover your whole account, or be limited to a single product. A product key cannot reach another product (`403 PRODUCT_SCOPE_VIOLATION`).\n- A handful of endpoints take **no API key** because they are called from your buyer's device or your shipped software (marked *public* below). They are protected by what the caller holds instead — a license key, or a short-lived signed token your server issued — and they are rate-limited.\n\n## Responses\n\nEvery answer has the same shape: `{ \"success\": true, \"data\": … }` on success, `{ \"success\": false, \"error\": \"…\", \"code\": \"…\" }` on failure. `error` is for humans, `code` is stable and meant for your code. Something that does not exist and something you are not allowed to see answer the same `404`: the API never reveals what belongs to someone else.\n\n## How you sell: the three modes\n\nEvery product is sold in exactly one way, chosen when the product is created and never changed afterwards:\n\n| Mode | What the buyer gets | Endpoints you will use |\n|---|---|---|\n| `SUBSCRIPTION` | Access billed every week, month, quarter or year | **Products**, **Subscriptions** |\n| `CREDITS` | A balance of credits (coins) spent as they use your service | **Products**, **Credits**, **Credits (public)** |\n| `LICENSE` | A license key that unlocks your software on a number of devices | **Products**, **Licenses**, **Licenses (public)**, **Licenses (retrieval)** |\n\nAn endpoint of another mode answers `409 MONETIZATION_MODE_MISMATCH`.\n\n## Which endpoint should I use?\n\nSome endpoints look alike. The difference, in one line each:\n\n- **Selling — Checkout vs. credit pack checkout.** `POST /checkout-sessions` sells a cart *you* price (your line items, your amounts). `POST /products/{productId}/credit-packs/{packId}/checkout` sells a credit bundle priced *by Itaja* (you never send an amount).\n- **Credits — wallet vs. balance.** `GET …/credits/{customerId}` returns the balance *and* every movement (for a statement or support). `GET …/credits/{customerId}/balance` returns only the number, and `0` for a buyer who never bought (for showing a counter).\n- **Credits — server vs. buyer's device.** `POST …/credits/consume` is called by your server with your API key. `POST /public/credits/consume` is called by the buyer's browser or app with a 15-minute token your server issued (`…/wallet-token`) — your key never leaves your server.\n- **Credits — expire one vs. expire all.** `…/credits/expire` clears one buyer's expired credits; `…/credits/expire-due` clears every buyer of the product. Itaja already runs the second every day.\n- **Licenses — suspend, revoke, rotate, resend.** *Suspend* blocks a key for a while and can be undone (*resume*). *Revoke* kills it for good. *Rotate* replaces a leaked key with a new one (devices must activate again). *Resend* emails the same key again to a buyer who lost it — nothing changes.\n- **Licenses — managing vs. checking.** The **Licenses** endpoints are for you (issue, list, revoke…), with your API key. The **Licenses (public)** endpoints are for the software you ship (verify, activate, deactivate), with the buyer's license key only.\n- **Subscriptions — cancel vs. pause.** *Cancel* ends the subscription, at the end of the paid period by default or right away with `immediately: true`. *Pause* freezes it (no renewal, no invoice) until you *resume* it, without losing paid days.\n- **There is no \"create a subscription\" endpoint**, on purpose: a subscription starts when the buyer pays its first period on the product's link.\n\nCategories and endpoints are listed in alphabetical order.",
     "version": "1.0.0"
   },
   "servers": [
@@ -109,6 +109,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": true,
                 "type": "object",
                 "required": [
                   "name",
@@ -134,15 +135,6 @@
                     "minLength": 1,
                     "maxLength": 120,
                     "type": "string"
-                  },
-                  "monetizationMode": {
-                    "type": "string",
-                    "enum": [
-                      "PAYLINK",
-                      "SUBSCRIPTION",
-                      "CREDITS",
-                      "LICENSE"
-                    ]
                   },
                   "mode": {
                     "type": "string",
@@ -202,13 +194,21 @@
                       "01",
                       "02"
                     ]
+                  },
+                  "monetizationMode": {
+                    "type": "string",
+                    "enum": [
+                      "SUBSCRIPTION",
+                      "CREDITS",
+                      "LICENSE"
+                    ]
                   }
-                },
-                "additionalProperties": true
+                }
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
+                "additionalProperties": true,
                 "type": "object",
                 "required": [
                   "name",
@@ -234,15 +234,6 @@
                     "minLength": 1,
                     "maxLength": 120,
                     "type": "string"
-                  },
-                  "monetizationMode": {
-                    "type": "string",
-                    "enum": [
-                      "PAYLINK",
-                      "SUBSCRIPTION",
-                      "CREDITS",
-                      "LICENSE"
-                    ]
                   },
                   "mode": {
                     "type": "string",
@@ -302,13 +293,21 @@
                       "01",
                       "02"
                     ]
+                  },
+                  "monetizationMode": {
+                    "type": "string",
+                    "enum": [
+                      "SUBSCRIPTION",
+                      "CREDITS",
+                      "LICENSE"
+                    ]
                   }
-                },
-                "additionalProperties": true
+                }
               }
             },
             "multipart/form-data": {
               "schema": {
+                "additionalProperties": true,
                 "type": "object",
                 "required": [
                   "name",
@@ -334,15 +333,6 @@
                     "minLength": 1,
                     "maxLength": 120,
                     "type": "string"
-                  },
-                  "monetizationMode": {
-                    "type": "string",
-                    "enum": [
-                      "PAYLINK",
-                      "SUBSCRIPTION",
-                      "CREDITS",
-                      "LICENSE"
-                    ]
                   },
                   "mode": {
                     "type": "string",
@@ -402,9 +392,16 @@
                       "01",
                       "02"
                     ]
+                  },
+                  "monetizationMode": {
+                    "type": "string",
+                    "enum": [
+                      "SUBSCRIPTION",
+                      "CREDITS",
+                      "LICENSE"
+                    ]
                   }
-                },
-                "additionalProperties": true
+                }
               }
             }
           }
@@ -433,7 +430,6 @@
                         "description",
                         "slug",
                         "status",
-                        "monetizationMode",
                         "mode",
                         "currency",
                         "creditCoinName",
@@ -443,7 +439,8 @@
                         "metadata",
                         "archivedAt",
                         "createdAt",
-                        "updatedAt"
+                        "updatedAt",
+                        "monetizationMode"
                       ],
                       "properties": {
                         "id": {
@@ -471,15 +468,6 @@
                             "DRAFT",
                             "ACTIVE",
                             "ARCHIVED"
-                          ]
-                        },
-                        "monetizationMode": {
-                          "type": "string",
-                          "enum": [
-                            "PAYLINK",
-                            "SUBSCRIPTION",
-                            "CREDITS",
-                            "LICENSE"
                           ]
                         },
                         "mode": {
@@ -569,6 +557,14 @@
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "monetizationMode": {
+                          "type": "string",
+                          "enum": [
+                            "SUBSCRIPTION",
+                            "CREDITS",
+                            "LICENSE"
+                          ]
                         }
                       }
                     }
@@ -718,7 +714,6 @@
                           "description",
                           "slug",
                           "status",
-                          "monetizationMode",
                           "mode",
                           "currency",
                           "creditCoinName",
@@ -728,7 +723,8 @@
                           "metadata",
                           "archivedAt",
                           "createdAt",
-                          "updatedAt"
+                          "updatedAt",
+                          "monetizationMode"
                         ],
                         "properties": {
                           "id": {
@@ -756,15 +752,6 @@
                               "DRAFT",
                               "ACTIVE",
                               "ARCHIVED"
-                            ]
-                          },
-                          "monetizationMode": {
-                            "type": "string",
-                            "enum": [
-                              "PAYLINK",
-                              "SUBSCRIPTION",
-                              "CREDITS",
-                              "LICENSE"
                             ]
                           },
                           "mode": {
@@ -854,6 +841,14 @@
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "monetizationMode": {
+                            "type": "string",
+                            "enum": [
+                              "SUBSCRIPTION",
+                              "CREDITS",
+                              "LICENSE"
+                            ]
                           }
                         }
                       }
@@ -908,7 +903,6 @@
                         "description",
                         "slug",
                         "status",
-                        "monetizationMode",
                         "mode",
                         "currency",
                         "creditCoinName",
@@ -918,7 +912,8 @@
                         "metadata",
                         "archivedAt",
                         "createdAt",
-                        "updatedAt"
+                        "updatedAt",
+                        "monetizationMode"
                       ],
                       "properties": {
                         "id": {
@@ -946,15 +941,6 @@
                             "DRAFT",
                             "ACTIVE",
                             "ARCHIVED"
-                          ]
-                        },
-                        "monetizationMode": {
-                          "type": "string",
-                          "enum": [
-                            "PAYLINK",
-                            "SUBSCRIPTION",
-                            "CREDITS",
-                            "LICENSE"
                           ]
                         },
                         "mode": {
@@ -1044,6 +1030,14 @@
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "monetizationMode": {
+                          "type": "string",
+                          "enum": [
+                            "SUBSCRIPTION",
+                            "CREDITS",
+                            "LICENSE"
+                          ]
                         }
                       }
                     }
@@ -1273,7 +1267,6 @@
                         "description",
                         "slug",
                         "status",
-                        "monetizationMode",
                         "mode",
                         "currency",
                         "creditCoinName",
@@ -1283,7 +1276,8 @@
                         "metadata",
                         "archivedAt",
                         "createdAt",
-                        "updatedAt"
+                        "updatedAt",
+                        "monetizationMode"
                       ],
                       "properties": {
                         "id": {
@@ -1311,15 +1305,6 @@
                             "DRAFT",
                             "ACTIVE",
                             "ARCHIVED"
-                          ]
-                        },
-                        "monetizationMode": {
-                          "type": "string",
-                          "enum": [
-                            "PAYLINK",
-                            "SUBSCRIPTION",
-                            "CREDITS",
-                            "LICENSE"
                           ]
                         },
                         "mode": {
@@ -1409,6 +1394,14 @@
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "monetizationMode": {
+                          "type": "string",
+                          "enum": [
+                            "SUBSCRIPTION",
+                            "CREDITS",
+                            "LICENSE"
+                          ]
                         }
                       }
                     }
@@ -1526,7 +1519,6 @@
                         "description",
                         "slug",
                         "status",
-                        "monetizationMode",
                         "mode",
                         "currency",
                         "creditCoinName",
@@ -1536,7 +1528,8 @@
                         "metadata",
                         "archivedAt",
                         "createdAt",
-                        "updatedAt"
+                        "updatedAt",
+                        "monetizationMode"
                       ],
                       "properties": {
                         "id": {
@@ -1564,15 +1557,6 @@
                             "DRAFT",
                             "ACTIVE",
                             "ARCHIVED"
-                          ]
-                        },
-                        "monetizationMode": {
-                          "type": "string",
-                          "enum": [
-                            "PAYLINK",
-                            "SUBSCRIPTION",
-                            "CREDITS",
-                            "LICENSE"
                           ]
                         },
                         "mode": {
@@ -1662,6 +1646,14 @@
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "monetizationMode": {
+                          "type": "string",
+                          "enum": [
+                            "SUBSCRIPTION",
+                            "CREDITS",
+                            "LICENSE"
+                          ]
                         }
                       }
                     }

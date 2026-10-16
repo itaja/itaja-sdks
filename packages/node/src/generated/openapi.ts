@@ -1124,8 +1124,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1140,6 +1138,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         }[];
                     };
                 };
@@ -1160,8 +1160,6 @@ export interface operations {
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
                     /** @enum {string} */
@@ -1173,6 +1171,8 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                 } & {
                     [key: string]: unknown;
                 };
@@ -1181,8 +1181,6 @@ export interface operations {
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
                     /** @enum {string} */
@@ -1194,6 +1192,8 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                 } & {
                     [key: string]: unknown;
                 };
@@ -1202,8 +1202,6 @@ export interface operations {
                     description?: string | null;
                     slug?: string;
                     /** @enum {string} */
-                    monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                    /** @enum {string} */
                     mode?: "sandbox" | "live";
                     currency?: string;
                     /** @enum {string} */
@@ -1215,6 +1213,8 @@ export interface operations {
                     goodsCategory?: "0000" | "1000" | "2000" | "3000" | "4000" | "5000" | "6000" | "7000" | "8000" | "9000" | "A000" | "B000" | "C000" | "D000" | "E000" | "F000" | "Z000";
                     /** @enum {string} */
                     goodsType?: "01" | "02";
+                    /** @enum {string} */
+                    monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                 } & {
                     [key: string]: unknown;
                 };
@@ -1238,8 +1238,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1254,6 +1252,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1339,8 +1339,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1355,6 +1353,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1448,8 +1448,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1464,6 +1462,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
@@ -1532,8 +1532,6 @@ export interface operations {
                             /** @enum {string} */
                             status: "DRAFT" | "ACTIVE" | "ARCHIVED";
                             /** @enum {string} */
-                            monetizationMode: "PAYLINK" | "SUBSCRIPTION" | "CREDITS" | "LICENSE";
-                            /** @enum {string} */
                             mode: "sandbox" | "live";
                             currency: string;
                             creditCoinName: string | null;
@@ -1548,6 +1546,8 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            /** @enum {string} */
+                            monetizationMode: "SUBSCRIPTION" | "CREDITS" | "LICENSE";
                         };
                     };
                 };
