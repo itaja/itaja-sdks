@@ -44,6 +44,5 @@ jobs:
         run: test "node-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - run: pnpm build
       - name: Stage the version (a maintainer approves it with 2FA)
+        # No token: npm trusted publishing (OIDC) authenticates this workflow.
         run: npm stage publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}

@@ -1,6 +1,6 @@
 {
   "name": "@itaja/node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Itaja for Node.js servers: declare your catalogue in code, push it, mount one webhook handler, react to typed events.",
   "license": "MIT",
   "type": "module",
