@@ -1,0 +1,83 @@
+{
+  "features": [
+    {
+      "id": "messages",
+      "type": "metered"
+    },
+    {
+      "id": "export",
+      "type": "boolean"
+    }
+  ],
+  "products": [
+    {
+      "id": "app",
+      "type": "subscription",
+      "name": "My App",
+      "plans": [
+        {
+          "id": "free",
+          "name": "Free",
+          "default": true,
+          "includes": [
+            {
+              "feature": "messages",
+              "limit": 100,
+              "reset": "month"
+            }
+          ]
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "price": {
+            "amount": 5000,
+            "currency": "XOF",
+            "interval": "month"
+          },
+          "trial": {
+            "days": 7
+          },
+          "includes": [
+            {
+              "feature": "messages",
+              "limit": 2000,
+              "reset": "month"
+            },
+            {
+              "feature": "export"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tokens",
+      "type": "credits",
+      "name": "AI tokens",
+      "coinName": "Tokens",
+      "packs": [
+        {
+          "id": "small",
+          "label": "100 Tokens",
+          "credits": 100,
+          "price": {
+            "amount": 1000,
+            "currency": "XOF"
+          }
+        }
+      ]
+    },
+    {
+      "id": "desktop",
+      "name": "Desktop app",
+      "devices": 3,
+      "duration": "days-365",
+      "price": {
+        "amount": 25000,
+        "currency": "XOF"
+      },
+      "type": "license"
+    }
+  ]
+}

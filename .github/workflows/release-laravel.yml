@@ -1,0 +1,51 @@
+# Releases itaja/itaja-laravel on a `laravel-vX.Y.Z` tag, only after the full CI passes.
+#
+# Packagist reads the composer.json at the ROOT of this repository (its `autoload` points to
+# packages/laravel/src), and it reads versions from tags that look like `vX.Y.Z`. The tags of
+# the other SDKs (`node-v…`) are not versions, so Packagist ignores them. This workflow checks
+# that the tag matches `Version::SDK`, creates the plain `vX.Y.Z` tag on the same commit, and
+# asks Packagist to re-read the repository. No mirror, no deploy key.
+#
+# The package is submitted once, by hand, on packagist.org with this repository's URL.
+name: release-laravel
+
+on:
+  push:
+    tags: ["laravel-v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci-laravel.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only to create the plain vX.Y.Z tag
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag matches the SDK version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#laravel-v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The constant the SDK sends in `x-itaja-client` must match the tag.
+          grep -q "SDK = '$version'" packages/laravel/src/Version.php
+
+      - name: Create the plain tag Packagist reads
+        run: |
+          git tag "v${{ steps.version.outputs.version }}" "$GITHUB_SHA"
+          git push origin "refs/tags/v${{ steps.version.outputs.version }}"
+
+      - name: Ask Packagist to re-read the repository
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"repository\":{\"url\":\"https://github.com/${GITHUB_REPOSITORY}\"}}"
