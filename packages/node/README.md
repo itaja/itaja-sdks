@@ -44,9 +44,15 @@ const pro = plan({
 });
 
 export const itaja = createItaja({
+  apiKey: process.env.ITAJA_API_KEY,               // itjs_… sandbox, itjp_… live
+  webhookSecret: process.env.ITAJA_WEBHOOK_SECRET, // signing secret of your webhook endpoint
+  baseUrl: process.env.ITAJA_API_URL,              // optional, defaults to https://api.getitaja.com/api/v1
   catalog: [messages, exportCsv, free, pro],
 });
 ```
+
+The three options are read from these environment variables when you leave them
+out, so `createItaja({ catalog })` works the same once they are set.
 
 Your ids (`"pro"`, `"messages"`) are yours and are typed as literals. Amounts
 are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API
@@ -56,7 +62,6 @@ price — fail as soon as the file loads.
 ### 2. Push it
 
 ```bash
-export ITAJA_API_KEY=itjs_…     # sandbox key; an itjp_… key writes the live catalogue
 npx itaja push                  # shows the diff, asks, applies
 ```
 
@@ -90,12 +95,15 @@ app.post("/itaja/webhook", (c) => itaja.handler(c.req.raw));
 app.post("/itaja/webhook", express.raw({ type: "*/*" }), itaja.nodeHandler);
 ```
 
-Set `ITAJA_WEBHOOK_SECRET` to the signing secret of the endpoint (dashboard).
+The route checks deliveries with `webhookSecret`, the signing secret of the
+endpoint in the dashboard.
 
 ### 4. React to events
 
 ```ts
 export const itaja = createItaja({
+  apiKey: process.env.ITAJA_API_KEY,
+  webhookSecret: process.env.ITAJA_WEBHOOK_SECRET,
   catalog: [messages, exportCsv, free, pro],
   on: {
     "checkout.paid": ({ data }) => fulfil(data.checkoutId),

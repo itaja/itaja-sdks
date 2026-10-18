@@ -18,6 +18,8 @@
  * K6. `subscribe`, `check` and `report` pretend to work: they must say the API
  *     does not serve them yet, never return a fake answer.
  * K7. A customer id with a slash or a space breaks the URL.
+ * K8. `with(apiKey:, baseUrl:)` is ignored, or changes the shared client the rest
+ *     of the app uses (a tenant's key leaks into another request).
  */
 
 namespace Itaja\Laravel\Tests;
@@ -191,6 +193,23 @@ final class ClientTest extends TestCase
             }
         }
         Http::assertNothingSent();
+    }
+
+    public function test_k8_with_gives_a_client_of_its_own_and_leaves_the_shared_one_alone(): void
+    {
+        Http::fake(['*' => $this->ok(['id' => 'cus_1'])]);
+
+        $tenant = ItajaFacade::with(apiKey: 'itjp_tenant', baseUrl: 'https://staging.test/api/v1');
+        $tenant->customers()->get('cus_1');
+        ItajaFacade::customers()->get('cus_1');
+
+        [$a, $b] = $this->sent();
+        $this->assertSame('live', $tenant->mode());
+        $this->assertSame('sandbox', ItajaFacade::mode());
+        $this->assertSame('https://staging.test/api/v1/customers/cus_1', $a->url());
+        $this->assertSame(['itjp_tenant'], $a->header('x-itj-key'));
+        $this->assertSame('https://api.test/api/v1/customers/cus_1', $b->url());
+        $this->assertSame(['itjs_test_key_for_unit_tests'], $b->header('x-itj-key'));
     }
 
     public function test_k7_an_id_with_a_slash_or_a_space_is_encoded(): void
