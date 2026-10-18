@@ -1,0 +1,9 @@
+# What `composer require itaja/itaja-laravel` downloads: the Laravel package only.
+/packages/node export-ignore
+/packages/python export-ignore
+/packages/dart export-ignore
+/packages/laravel/tests export-ignore
+/packages/laravel/phpunit.xml.dist export-ignore
+/spec export-ignore
+/.github export-ignore
+/.gitattributes export-ignore

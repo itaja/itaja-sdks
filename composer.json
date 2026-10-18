@@ -1,7 +1,15 @@
 {
   "name": "itaja/itaja-laravel",
   "description": "Itaja for Laravel: declare what you sell in code, push it, receive webhooks as Laravel events.",
-  "keywords": ["itaja", "laravel", "payments", "subscriptions", "credits", "licenses", "webhooks"],
+  "keywords": [
+    "itaja",
+    "laravel",
+    "payments",
+    "subscriptions",
+    "credits",
+    "licenses",
+    "webhooks"
+  ],
   "type": "library",
   "license": "MIT",
   "homepage": "https://github.com/itaja/itaja-sdks/tree/main/packages/laravel",
@@ -23,21 +31,31 @@
     "phpunit/phpunit": "^11.5||^12.0||^13.0"
   },
   "autoload": {
-    "psr-4": { "Itaja\\Laravel\\": "src/" }
+    "psr-4": {
+      "Itaja\\Laravel\\": "packages/laravel/src/"
+    }
   },
   "autoload-dev": {
-    "psr-4": { "Itaja\\Laravel\\Tests\\": "tests/" }
+    "psr-4": {
+      "Itaja\\Laravel\\Tests\\": "packages/laravel/tests/"
+    }
   },
   "extra": {
     "laravel": {
-      "providers": ["Itaja\\Laravel\\ItajaServiceProvider"],
-      "aliases": { "Itaja": "Itaja\\Laravel\\Facades\\Itaja" }
+      "providers": [
+        "Itaja\\Laravel\\ItajaServiceProvider"
+      ],
+      "aliases": {
+        "Itaja": "Itaja\\Laravel\\Facades\\Itaja"
+      }
     }
   },
   "scripts": {
-    "test": "phpunit"
+    "test": "phpunit -c packages/laravel/phpunit.xml.dist"
   },
-  "config": { "sort-packages": true },
+  "config": {
+    "sort-packages": true
+  },
   "minimum-stability": "stable",
   "prefer-stable": true
 }

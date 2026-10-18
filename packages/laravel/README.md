@@ -270,7 +270,7 @@ There is no `environment` option: the key's prefix decides sandbox or live.
 ## Development
 
 ```bash
-composer install
+composer install   # from the repository root: its composer.json is the package's
 composer test
 ```
 

@@ -3,17 +3,13 @@ name: ci-laravel
 on:
   push:
     branches: [main]
-    paths: ["packages/laravel/**", "spec/**", ".github/workflows/ci-laravel.yml"]
+    paths: ["packages/laravel/**", "composer.json", "spec/**", ".github/workflows/ci-laravel.yml"]
   pull_request:
-    paths: ["packages/laravel/**", "spec/**", ".github/workflows/ci-laravel.yml"]
+    paths: ["packages/laravel/**", "composer.json", "spec/**", ".github/workflows/ci-laravel.yml"]
   workflow_call:
 
 permissions:
   contents: read
-
-defaults:
-  run:
-    working-directory: packages/laravel
 
 jobs:
   test:
@@ -40,4 +36,5 @@ jobs:
         run: |
           composer require --no-interaction --no-update --dev "laravel/framework:${{ matrix.laravel }}"
           composer update --no-interaction --prefer-dist --with-all-dependencies
-      - run: vendor/bin/phpunit
+      - run: composer validate --strict
+      - run: composer test
