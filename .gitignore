@@ -8,3 +8,11 @@ dist
 /vendor
 /composer.lock
 .phpunit.cache
+
+# Python
+__pycache__/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+packages/python/dist/

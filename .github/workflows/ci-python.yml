@@ -1,0 +1,45 @@
+name: ci-python
+
+on:
+  push:
+    branches: [main]
+    paths: ["packages/python/**", "spec/**", ".github/workflows/ci-python.yml"]
+  pull_request:
+    paths: ["packages/python/**", "spec/**", ".github/workflows/ci-python.yml"]
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: packages/python
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    name: python ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+          cache-dependency-glob: packages/python/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy
+      - run: uv run pytest
+      # The built wheel, in a clean environment, without the dev dependencies.
+      - name: The wheel installs and imports on its own
+        run: |
+          uv build
+          uv venv /tmp/wheel
+          VIRTUAL_ENV=/tmp/wheel uv pip install "$(ls dist/*.whl)"
+          /tmp/wheel/bin/python -c "import itaja; print(itaja.__version__)"
+          /tmp/wheel/bin/itaja --help
