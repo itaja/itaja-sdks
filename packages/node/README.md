@@ -13,6 +13,30 @@ npm i @itaja/node        # pnpm add @itaja/node · bun add @itaja/node
 
 ## Quick start
 
+### 0. Configure
+
+Put your keys in `.env` (never commit it) and pass them to `createItaja`:
+
+```bash
+# .env
+ITAJA_API_KEY=itjs_…              # sandbox key; an itjp_… key works on the live catalogue
+ITAJA_WEBHOOK_SECRET=whsec_…      # signing secret of your webhook endpoint (dashboard)
+ITAJA_API_URL=https://api.getitaja.com/api/v1   # optional
+```
+
+```ts
+createItaja({
+  apiKey: process.env.ITAJA_API_KEY,
+  webhookSecret: process.env.ITAJA_WEBHOOK_SECRET,
+  baseUrl: process.env.ITAJA_API_URL,
+  catalog: [/* … */],
+});
+```
+
+Each option falls back to its variable when you leave it out. Pass other values to
+use another account, a tenant's key or a staging API. The `itaja` CLI loads `.env`
+and `.env.local` itself: nothing to export in your shell.
+
 ### 1. Declare what you sell
 
 A free plan and a paid plan, with a quota that depends on the plan.
@@ -44,9 +68,15 @@ const pro = plan({
 });
 
 export const itaja = createItaja({
+  apiKey: process.env.ITAJA_API_KEY,               // itjs_… sandbox, itjp_… live
+  webhookSecret: process.env.ITAJA_WEBHOOK_SECRET, // signing secret of your webhook endpoint
+  baseUrl: process.env.ITAJA_API_URL,              // optional, defaults to https://api.getitaja.com/api/v1
   catalog: [messages, exportCsv, free, pro],
 });
 ```
+
+The three options are read from these environment variables when you leave them
+out, so `createItaja({ catalog })` works the same once they are set.
 
 Your ids (`"pro"`, `"messages"`) are yours and are typed as literals. Amounts
 are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API
@@ -56,11 +86,10 @@ price — fail as soon as the file loads.
 ### 2. Push it
 
 ```bash
-export ITAJA_API_KEY=itjs_…     # sandbox key; an itjp_… key writes the live catalogue
 npx itaja push                  # shows the diff, asks, applies
 ```
 
-Run it again: nothing changes. Change a price and a **new version** of the plan
+`push` uses the `apiKey` of your `itaja.config.ts`. Run it again: nothing changes. Change a price and a **new version** of the plan
 is created; running subscriptions keep theirs. Whatever you remove is archived,
 never deleted, and products made in the dashboard are never touched.
 
@@ -90,12 +119,15 @@ app.post("/itaja/webhook", (c) => itaja.handler(c.req.raw));
 app.post("/itaja/webhook", express.raw({ type: "*/*" }), itaja.nodeHandler);
 ```
 
-Set `ITAJA_WEBHOOK_SECRET` to the signing secret of the endpoint (dashboard).
+The route checks deliveries with `webhookSecret`, the signing secret of the
+endpoint in the dashboard.
 
 ### 4. React to events
 
 ```ts
 export const itaja = createItaja({
+  apiKey: process.env.ITAJA_API_KEY,
+  webhookSecret: process.env.ITAJA_WEBHOOK_SECRET,
   catalog: [messages, exportCsv, free, pro],
   on: {
     "checkout.paid": ({ data }) => fulfil(data.checkoutId),
@@ -109,7 +141,7 @@ export const itaja = createItaja({
 types this version does not know yet. Test a handler locally with a signed sample:
 
 ```bash
-ITAJA_WEBHOOK_SECRET=… npx itaja trigger checkout.paid --url http://localhost:3000/itaja/webhook
+npx itaja trigger checkout.paid --url http://localhost:3000/itaja/webhook   # signs with ITAJA_WEBHOOK_SECRET from .env
 ```
 
 ## What you can sell
@@ -226,6 +258,7 @@ Verify a delivery yourself, without the handler:
 ```ts
 import { constructEvent } from "@itaja/node";
 const event = constructEvent({ payload: rawBody, headers, secret: process.env.ITAJA_WEBHOOK_SECRET! });
+// the same secret you pass to createItaja
 ```
 
 Behind several instances, share the processed-delivery store (it is in memory by default):
@@ -255,6 +288,8 @@ retries, so a retried write never runs twice. Network errors, `5xx`, `429` and
 Pass `{ idempotencyKey }` (an order id, say) to make **your own** retries safe too.
 
 ## Configuration
+
+Every option of `createItaja`, and the variable it falls back to:
 
 | Option | Environment | Default |
 |---|---|---|

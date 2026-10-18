@@ -217,9 +217,10 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
       }),
     );
 
-  const write = <T>(method: "POST" | "PUT" | "PATCH", path: string, body: unknown, opts?: WriteOptions) =>
+  // async: a missing key rejects the returned promise, it never throws synchronously.
+  const write = async <T>(method: "POST" | "PUT" | "PATCH", path: string, body: unknown, opts?: WriteOptions) =>
     http().request<T>({ method, path, body, idempotencyKey: opts?.idempotencyKey });
-  const read = <T>(path: string, query?: Record<string, string | number | boolean | undefined>) =>
+  const read = async <T>(path: string, query?: Record<string, string | number | boolean | undefined>) =>
     http().request<T>({ method: "GET", path, query });
 
   /** Credits take their own body `idempotencyKey`; the SDK sends the header's, so a retry is one movement. */
@@ -239,7 +240,7 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
   return {
     mode,
     catalog,
-    push: (opts = {}) =>
+    push: async (opts = {}) =>
       http().request({
         method: "PUT",
         path: "/catalog",
@@ -319,7 +320,7 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
     check: () => notYet("check()", 466),
     report: () => notYet("report()", 466),
 
-    request: (method, path, opts = {}) => http().request({ method, path, ...opts }),
+    request: async (method, path, opts = {}) => http().request({ method, path, ...opts }),
   } as Itaja<C>;
 }
 

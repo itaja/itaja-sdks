@@ -55,7 +55,17 @@ throw a `ConfigException` as soon as the file loads.
 ### 2. Push it
 
 ```env
-ITAJA_API_KEY=itjs_…        # sandbox key; an itjp_… key writes the live catalogue
+ITAJA_API_KEY=itjs_…              # sandbox key; an itjp_… key writes the live catalogue
+ITAJA_WEBHOOK_SECRET=whsec_…      # signing secret of your webhook endpoint (dashboard)
+ITAJA_API_URL=https://api.getitaja.com/api/v1   # optional
+```
+
+`config/itaja.php` reads these three variables. To use another key, secret or API
+URL in code — a second Itaja account, a tenant, a test:
+
+```php
+$tenant = Itaja::with(apiKey: $shop->itaja_key, baseUrl: 'https://…/api/v1');
+$tenant->customers()->get('user_42');
 ```
 
 ```bash
@@ -79,10 +89,6 @@ The key's prefix picks the mode: `itjs_` is sandbox, `itjp_` is live.
 `POST /itaja/webhook` exists as soon as the package is installed. It checks the
 signature on the raw body, ignores a delivery it already handled, ignores events of
 the other mode, and answers `500` when a listener throws so Itaja delivers again.
-
-```env
-ITAJA_WEBHOOK_SECRET=whsec_…   # the signing secret of the endpoint (dashboard)
-```
 
 Laravel's CSRF protection is lifted on that one route. To mount it yourself, set
 `itaja.webhook.path` to `null` and point a route at `Itaja\Laravel\Http\WebhookController`.

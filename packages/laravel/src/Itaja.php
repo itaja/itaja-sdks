@@ -48,6 +48,29 @@ final class Itaja
         $this->declaration = $declaration ?? fn (): iterable => $this->loadDeclaration();
     }
 
+    /**
+     * Another client with its own key, webhook secret or API URL — for a second
+     * Itaja account, a test, or a tenant. Unset values keep this client's
+     * configuration (`ITAJA_API_KEY`, `ITAJA_WEBHOOK_SECRET`, `ITAJA_API_URL`).
+     *
+     *     $tenant = Itaja::with(apiKey: $shop->itaja_key);
+     */
+    public function with(?string $apiKey = null, ?string $webhookSecret = null, ?string $baseUrl = null): self
+    {
+        $config = $this->config;
+        if ($apiKey !== null) {
+            $config['api_key'] = $apiKey;
+        }
+        if ($webhookSecret !== null) {
+            $config['webhook_secret'] = $webhookSecret;
+        }
+        if ($baseUrl !== null) {
+            $config['base_url'] = $baseUrl;
+        }
+
+        return new self($this->container, $config, $this->declaration, $this->sleep);
+    }
+
     /** The API key's mode: `sandbox` (`itjs_`) or `live` (`itjp_`). */
     public function mode(): string
     {

@@ -9,7 +9,10 @@
  *                                send a signed sample event to your local handler
  *
  * Options: --config <file> (default: itaja.config.ts, .mts, .js, .mjs), --json.
- * The key and secret come from ITAJA_API_KEY / ITAJA_WEBHOOK_SECRET, never a flag.
+ * The key and secret come from your config file (createItaja({ apiKey, webhookSecret })),
+ * which usually reads them from ITAJA_API_KEY / ITAJA_WEBHOOK_SECRET — never from a flag.
+ * The CLI loads `.env` and `.env.local` from the current directory first, so nothing
+ * has to be exported in the shell.
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -21,6 +24,20 @@ import type { Itaja } from "./client.js";
 import type { CatalogItem } from "./catalog.js";
 import { ItajaError } from "./errors.js";
 import { signPayload } from "./webhooks.js";
+
+// process.loadEnvFile never overrides a variable already set: loading .env.local first
+// makes it win over .env, and the shell wins over both.
+const ENV_FILES = [".env.local", ".env"];
+
+/** Loads `.env.local` then `.env` (Node >= 20.12). */
+function loadEnvFiles(): void {
+  const load = (process as { loadEnvFile?: (path: string) => void }).loadEnvFile;
+  if (typeof load !== "function") return;
+  for (const name of ENV_FILES) {
+    const path = resolve(name);
+    if (existsSync(path)) load(path);
+  }
+}
 
 const CONFIG_NAMES = ["itaja.config.ts", "itaja.config.mts", "itaja.config.js", "itaja.config.mjs"];
 
@@ -103,6 +120,7 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
 };
 
 async function main(argv: string[]): Promise<number> {
+  loadEnvFiles();
   const { command, positional, flags } = parse(argv);
   const asJson = flags.json === true;
 
@@ -152,7 +170,7 @@ async function main(argv: string[]): Promise<number> {
       const url = typeof flags.url === "string" ? flags.url : undefined;
       const secret = process.env.ITAJA_WEBHOOK_SECRET;
       if (!type || !url) throw new Error("Usage: itaja trigger <type> --url <url> [--data '<json>'] [--mode sandbox|live]");
-      if (!secret) throw new Error("Set ITAJA_WEBHOOK_SECRET to the secret your handler checks.");
+      if (!secret) throw new Error("Set ITAJA_WEBHOOK_SECRET (in .env) to the secret your handler checks.");
       const data = typeof flags.data === "string" ? (JSON.parse(flags.data) as Record<string, unknown>) : SAMPLES[type];
       if (!data) throw new Error(`No sample for "${type}": pass --data '<json>'. Samples: ${Object.keys(SAMPLES).join(", ")}.`);
       const mode = flags.mode === "live" ? "live" : "sandbox";
@@ -177,7 +195,7 @@ async function main(argv: string[]): Promise<number> {
           "",
           "--config <file>   default: itaja.config.ts | .mts | .js | .mjs",
           "--json            machine-readable output",
-          "Environment: ITAJA_API_KEY, ITAJA_WEBHOOK_SECRET, ITAJA_API_URL",
+          "Reads .env and .env.local: ITAJA_API_KEY, ITAJA_WEBHOOK_SECRET, ITAJA_API_URL",
         ].join("\n"),
       );
       return 0;

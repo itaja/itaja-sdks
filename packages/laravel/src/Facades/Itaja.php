@@ -5,6 +5,7 @@ namespace Itaja\Laravel\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
+ * @method static \Itaja\Laravel\Itaja with(?string $apiKey = null, ?string $webhookSecret = null, ?string $baseUrl = null)
  * @method static string mode()
  * @method static array catalog()
  * @method static array push(bool $dryRun = false, ?string $idempotencyKey = null)
