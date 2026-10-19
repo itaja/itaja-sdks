@@ -6897,6 +6897,21 @@
                     "maxLength": 2048,
                     "type": "string"
                   },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
                   "reference": {
                     "minLength": 1,
                     "maxLength": 128,
@@ -6928,6 +6943,21 @@
                     "maxLength": 2048,
                     "type": "string"
                   },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
                   "reference": {
                     "minLength": 1,
                     "maxLength": 128,
@@ -6955,6 +6985,21 @@
                     "type": "string"
                   },
                   "homeUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
                     "minLength": 1,
                     "maxLength": 2048,
                     "type": "string"
@@ -14731,6 +14776,21 @@
                     "maxLength": 2048,
                     "type": "string"
                   },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
                   "description": {
                     "minLength": 1,
                     "maxLength": 512,
@@ -14819,6 +14879,21 @@
                     "maxLength": 2048,
                     "type": "string"
                   },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
                   "description": {
                     "minLength": 1,
                     "maxLength": 512,
@@ -14903,6 +14978,21 @@
                     "type": "string"
                   },
                   "homeUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "successUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "failureUrl": {
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
                     "minLength": 1,
                     "maxLength": 2048,
                     "type": "string"
@@ -15341,6 +15431,583 @@
           }
         },
         "operationId": "postApiV1Quotes"
+      }
+    },
+    "/api/v1/subscriptions/subscribe": {
+      "post": {
+        "description": "**In short:** One call moves a customer to a plan of a subscription product — new subscription, upgrade, downgrade, cancel to the free plan, or undo a pending change.\n\n`customerId` is Itaja's id or your own. `outcome` says what happened:\n\n- `payment_required` — no subscription yet, paid plan: send the customer to `paymentUrl` (bound to this customer, it returns to your `successUrl` / `cancelUrl`). The URL expires at `paymentUrlExpiresAt` (24 h): past it the pay page answers `410`, call `subscribe` again. Nothing is created until the first period is paid.\n- `on_default_plan` — no subscription, the product's default (free) plan: nothing is written, the customer is on it.\n- `upgrade_pending` — a higher plan: the prorated difference is invoiced now and payable at `paymentUrl`; the new plan applies once it is paid.\n- `change_scheduled` — a lower plan (or any change during a free trial): applied at `scheduledChange.effectiveAt`, the next period is billed at the new price.\n- `cancel_scheduled` — the default plan: the subscription ends at the end of the paid period.\n- `pending_cleared` — the current plan while a change or a cancel was pending: both are undone and the next period is billed again.\n- `unchanged` — nothing to do; a replay of the same call lands here.\n\n`404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.",
+        "tags": [
+          "Subscriptions"
+        ],
+        "summary": "Subscribe a customer to a plan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerId",
+                  "planId"
+                ],
+                "properties": {
+                  "customerId": {
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "type": "string"
+                  },
+                  "planId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "type": "string"
+                  },
+                  "successUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerId",
+                  "planId"
+                ],
+                "properties": {
+                  "customerId": {
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "type": "string"
+                  },
+                  "planId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "type": "string"
+                  },
+                  "successUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerId",
+                  "planId"
+                ],
+                "properties": {
+                  "customerId": {
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "type": "string"
+                  },
+                  "planId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "type": "string"
+                  },
+                  "successUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  },
+                  "cancelUrl": {
+                    "format": "uri",
+                    "maxLength": 2048,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": true,
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "outcome",
+                        "subscription",
+                        "paymentUrl",
+                        "paymentUrlExpiresAt",
+                        "scheduledChange",
+                        "onDefaultPlan"
+                      ],
+                      "properties": {
+                        "outcome": {
+                          "default": "payment_required",
+                          "type": "string",
+                          "enum": [
+                            "payment_required",
+                            "on_default_plan",
+                            "upgrade_pending",
+                            "change_scheduled",
+                            "cancel_scheduled",
+                            "pending_cleared",
+                            "unchanged"
+                          ]
+                        },
+                        "subscription": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "allOf": [
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "status",
+                                    "collectionMode",
+                                    "quantity",
+                                    "currency",
+                                    "trialEndsAt",
+                                    "currentPeriodStart",
+                                    "currentPeriodEnd",
+                                    "cancelAtPeriodEnd",
+                                    "canceledAt",
+                                    "pausedAt",
+                                    "endedAt",
+                                    "createdAt",
+                                    "customer",
+                                    "plan",
+                                    "product"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string"
+                                    },
+                                    "collectionMode": {
+                                      "type": "string"
+                                    },
+                                    "quantity": {
+                                      "type": "integer"
+                                    },
+                                    "currency": {
+                                      "type": "string"
+                                    },
+                                    "trialEndsAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "currentPeriodStart": {
+                                      "type": "string"
+                                    },
+                                    "currentPeriodEnd": {
+                                      "type": "string"
+                                    },
+                                    "cancelAtPeriodEnd": {
+                                      "type": "boolean"
+                                    },
+                                    "canceledAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "pausedAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "endedAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "createdAt": {
+                                      "type": "string"
+                                    },
+                                    "customer": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "name",
+                                        "email"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "email": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "plan": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "name",
+                                        "amount",
+                                        "interval",
+                                        "intervalCount"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "amount": {
+                                          "type": "number"
+                                        },
+                                        "interval": {
+                                          "type": "string"
+                                        },
+                                        "intervalCount": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "product": {
+                                      "type": "object",
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ],
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "invoices"
+                                  ],
+                                  "properties": {
+                                    "invoices": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "number",
+                                          "status",
+                                          "total",
+                                          "currency",
+                                          "periodStart",
+                                          "periodEnd",
+                                          "shouldBePaidBefore",
+                                          "paidAt",
+                                          "voidedAt"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "number": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "status": {
+                                            "type": "string"
+                                          },
+                                          "total": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "currency": {
+                                            "type": "string"
+                                          },
+                                          "periodStart": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "periodEnd": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "shouldBePaidBefore": {
+                                            "type": "string"
+                                          },
+                                          "paidAt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "voidedAt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "paymentUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "paymentUrlExpiresAt": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "scheduledChange": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "type",
+                                "planId",
+                                "effectiveAt"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "default": "plan_change",
+                                  "type": "string",
+                                  "enum": [
+                                    "plan_change",
+                                    "cancel"
+                                  ]
+                                },
+                                "planId": {
+                                  "type": "string"
+                                },
+                                "effectiveAt": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "onDefaultPlan": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Response for status 401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": false,
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Response for status 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": false,
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": false,
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": false,
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiV1SubscriptionsSubscribe"
       }
     },
     "/api/v1/subscriptions": {
