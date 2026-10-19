@@ -68,7 +68,11 @@ class Customers(_Resource):
 
 class Checkout(_Resource):
     def create(self, *, idempotency_key: str | None = None, **fields: Any) -> Any:
-        """A cart you price yourself (``homeUrl``, ``currency``, ``lineItems``...). Returns the ``checkoutUrl``."""
+        """A cart you price yourself (``homeUrl``, ``currency``, ``lineItems``...). Returns the ``checkoutUrl``.
+
+        ``successUrl``, ``failureUrl`` and ``cancelUrl`` (optional) are where Itaja's return page
+        sends the payer for each outcome; confirm payment from the webhook, never from the redirect.
+        """
         return self._req("POST", "/checkout-sessions", body=fields, idempotency_key=idempotency_key)
 
 
@@ -150,11 +154,17 @@ class Credits(_Resource):
         home_url: str,
         product: str | None = None,
         product_id: str | None = None,
+        success_url: str | None = None,
+        failure_url: str | None = None,
+        cancel_url: str | None = None,
         reference: str | None = None,
         language: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
-        """Sells a declared pack: returns the checkout to send the buyer to."""
+        """Sells a declared pack: returns the checkout to send the buyer to.
+
+        ``success_url``, ``failure_url`` and ``cancel_url`` are optional, as on ``checkout.create``.
+        """
         base = self._path(product, product_id)
         listed = self._req("GET", f"{base}/credit-packs")
         packs = listed.get("packs", []) if isinstance(listed, dict) else []
@@ -163,7 +173,17 @@ class Credits(_Resource):
             raise ItajaNotFoundError(
                 f'Credit pack "{pack}" is not on sale for this product.', code="CREDIT_PACK_NOT_FOUND", status=404
             )
-        body = _clean({"customerId": customer_id, "homeUrl": home_url, "reference": reference, "language": language})
+        body = _clean(
+            {
+                "customerId": customer_id,
+                "homeUrl": home_url,
+                "successUrl": success_url,
+                "failureUrl": failure_url,
+                "cancelUrl": cancel_url,
+                "reference": reference,
+                "language": language,
+            }
+        )
         return self._req(
             "POST", f"{base}/credit-packs/{_seg(found['id'])}/checkout", body=body, idempotency_key=idempotency_key
         )

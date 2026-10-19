@@ -74,10 +74,12 @@ final class Credits
 
     /**
      * Sells a declared pack: returns the checkout to send the buyer to.
+     * `successUrl`, `failureUrl` and `cancelUrl` are optional, as on `checkout()->create()`;
+     * they come last so existing positional calls keep their meaning — name them.
      *
      * @return array<string, mixed>
      */
-    public function buy(string $pack, string $customerId, string $homeUrl, ?string $product = null, ?string $productId = null, ?string $reference = null, ?string $language = null, ?string $idempotencyKey = null): array
+    public function buy(string $pack, string $customerId, string $homeUrl, ?string $product = null, ?string $productId = null, ?string $reference = null, ?string $language = null, ?string $idempotencyKey = null, ?string $successUrl = null, ?string $failureUrl = null, ?string $cancelUrl = null): array
     {
         $base = $this->path($product, $productId);
         $listed = $this->http->request('GET', $base.'/credit-packs');
@@ -95,6 +97,9 @@ final class Credits
         return $this->http->request('POST', "{$base}/credit-packs/{$this->seg((string) $found['id'])}/checkout", null, array_filter([
             'customerId' => $customerId,
             'homeUrl' => $homeUrl,
+            'successUrl' => $successUrl,
+            'failureUrl' => $failureUrl,
+            'cancelUrl' => $cancelUrl,
             'reference' => $reference,
             'language' => $language,
         ], fn ($v) => $v !== null), $idempotencyKey);

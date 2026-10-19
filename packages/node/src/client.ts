@@ -85,7 +85,12 @@ export interface Itaja<C extends readonly CatalogItem[]> {
   };
 
   readonly checkout: {
-    /** A cart you price yourself. Returns the `checkoutUrl` to send the buyer to. */
+    /**
+     * A cart you price yourself. Returns the `checkoutUrl` to send the buyer to.
+     * `successUrl`, `failureUrl` and `cancelUrl` (optional) are where Itaja's return
+     * page sends the payer for each outcome; confirm payment from the webhook, never
+     * from the redirect.
+     */
     create(input: RequestBody<"/checkout-sessions", "post">, options?: WriteOptions): Promise<Data<"/checkout-sessions", "post">>;
   };
 
@@ -98,9 +103,21 @@ export interface Itaja<C extends readonly CatalogItem[]> {
     /** A 15-minute token the buyer's device spends with, without your key. */
     walletToken(input: CreditRef<CreditsIdOf<C>>): Promise<Data<"/products/{productId}/credits/{customerId}/wallet-token", "post">>;
     packs(ref: ProductRef<CreditsIdOf<C>>): Promise<Data<"/products/{productId}/credit-packs", "get">>;
-    /** Sells a declared pack: returns the checkout to send the buyer to. */
+    /**
+     * Sells a declared pack: returns the checkout to send the buyer to.
+     * `successUrl`, `failureUrl` and `cancelUrl` are optional, as on `checkout.create`.
+     */
     buy(
-      input: ProductRef<CreditsIdOf<C>> & { pack: string; customerId: string; homeUrl: string; reference?: string; language?: string },
+      input: ProductRef<CreditsIdOf<C>> & {
+        pack: string;
+        customerId: string;
+        homeUrl: string;
+        successUrl?: string;
+        failureUrl?: string;
+        cancelUrl?: string;
+        reference?: string;
+        language?: string;
+      },
       options?: WriteOptions,
     ): Promise<Data<"/products/{productId}/credit-packs/{packId}/checkout", "post">>;
   };
@@ -286,8 +303,9 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
             status: 404,
           });
         }
-        const { customerId, homeUrl, reference, language } = input;
-        return write("POST", `/products/${seg(pid)}/credit-packs/${seg(pack.id)}/checkout`, { customerId, homeUrl, reference, language }, opts);
+        const { customerId, homeUrl, successUrl, failureUrl, cancelUrl, reference, language } = input;
+        const body = { customerId, homeUrl, successUrl, failureUrl, cancelUrl, reference, language };
+        return write("POST", `/products/${seg(pid)}/credit-packs/${seg(pack.id)}/checkout`, body, opts);
       },
     },
 
