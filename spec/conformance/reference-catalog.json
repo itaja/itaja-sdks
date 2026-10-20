@@ -16,7 +16,6 @@
       "name": "My App",
       "plans": [
         {
-          "id": "free",
           "name": "Free",
           "default": true,
           "includes": [
@@ -28,7 +27,6 @@
           ]
         },
         {
-          "id": "pro",
           "name": "Pro",
           "price": {
             "amount": 5000,

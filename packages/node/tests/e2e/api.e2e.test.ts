@@ -43,9 +43,9 @@ const id = (name: string) => `${name}-${RUN}`;
 function declare(proPrice: number) {
   const messages = feature({ id: id("messages"), type: "metered" });
   const app = group({ id: id("app"), name: "SDK e2e app" });
-  const free = plan({ id: "free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
+  const free = plan({ name: "Free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
   const pro = plan({
-    id: "pro",
+    name: "Pro",
     group: app,
     price: { amount: proPrice, currency: "XOF", interval: "month" },
     includes: [messages({ limit: 2000, reset: "month" })],
@@ -88,7 +88,7 @@ describe.skipIf(!enabled)("itaja-node against a real developer API", () => {
 
     const repriced = await createItaja({ apiKey, baseUrl, catalog: declare(6000) }).push();
     walk.push({ step: "pro repriced", changes: mine(repriced).filter((c) => c.action !== "unchanged") });
-    const pro = mine(repriced).find((c) => c.kind === "plan" && c.key === "pro");
+    const pro = mine(repriced).find((c) => c.kind === "plan" && c.key?.toLowerCase() === "pro");
     expect(pro).toMatchObject({ action: "changed", version: 2 });
   });
 

@@ -17,7 +17,7 @@ import {
   type CatalogItem,
   type CreditsIdOf,
   type LicenseIdOf,
-  type PlanIdOf,
+  type PlanNameOf,
   type ProductIdOf,
   toCatalogDocument,
 } from "./catalog.js";
@@ -145,7 +145,7 @@ export interface Itaja<C extends readonly CatalogItem[]> {
    * One call for new, upgrade, downgrade, cancel-to-free and resume (ADR 0015 D4).
    * **Not served by the API yet** (itaja/itaja-services#465): throws `NOT_YET_AVAILABLE`.
    */
-  subscribe(input: { customerId: string; plan: PlanIdOf<C>; successUrl?: string; cancelUrl?: string }): Promise<never>;
+  subscribe(input: { customerId: string; plan: PlanNameOf<C>; successUrl?: string; cancelUrl?: string }): Promise<never>;
   /** Is this customer entitled to a feature? **Not served yet** (#466). */
   check(input: { customerId: string; feature: string }): Promise<never>;
   /** Count usage against a metered feature. **Not served yet** (#466). */
@@ -343,4 +343,4 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
 }
 
 /** The ids your catalogue declares, for your own signatures. */
-export type { PlanIdOf, CreditsIdOf, LicenseIdOf, ProductIdOf };
+export type { PlanNameOf, CreditsIdOf, LicenseIdOf, ProductIdOf };

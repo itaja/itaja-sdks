@@ -9,9 +9,9 @@ export const messages = feature({ id: "messages", type: "metered" });
 export const exportCsv = feature({ id: "export", type: "boolean" });
 
 const app = group({ id: process.env.EXAMPLE_GROUP_ID ?? "app", name: "My App" });
-export const free = plan({ id: "free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
+export const free = plan({ name: "Free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
 export const pro = plan({
-  id: "pro",
+  name: "Pro",
   group: app,
   price: { amount: 5000, currency: "XOF", interval: "month" },
   trial: { days: 7 },

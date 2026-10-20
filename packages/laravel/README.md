@@ -34,12 +34,12 @@ return [
     $messages,
     $export,
 
-    Plan::make('free', $app,
+    Plan::make('Free', $app,
         default: true, // everyone starts here, no payment
         includes: [$messages(limit: 100, reset: 'month')],
     ),
 
-    Plan::make('pro', $app,
+    Plan::make('Pro', $app,
         price: ['amount' => 5000, 'currency' => 'XOF', 'interval' => 'month'],
         trialDays: 7,
         includes: [$messages(limit: 2000, reset: 'month'), $export()],
@@ -47,9 +47,13 @@ return [
 ];
 ```
 
-Your ids (`'pro'`, `'messages'`) are yours. Amounts are in **major units**
-(`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — an
-undeclared feature, two default plans, a paid plan without a price, an invalid id —
+A plan is identified by its **name** (`'Free'`, `'Pro'`), compared case-insensitively
+and ignoring extra spaces within its group: Itaja assigns the plan's system id, and
+renaming a plan creates a new plan and archives the old one. Products, features,
+credit packs and licences keep the ids you give them (`'app'`, `'messages'`).
+Amounts are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — an
+undeclared feature, two default plans, a paid plan without a price, two plans with
+the same name, an invalid id —
 throw a `ConfigException` as soon as the file loads.
 
 ### 2. Push it
@@ -137,7 +141,7 @@ Each one can live in the same `itaja.php`.
 The example above is the whole declaration. Around it:
 
 ```php
-Plan::make('team', $app,
+Plan::make('Team', $app,
     price: ['amount' => 15000, 'currency' => 'XOF', 'interval' => 'month'],
     includes: [$messages(limit: 20000, reset: 'month'), $export()],
 );

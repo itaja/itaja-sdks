@@ -951,7 +951,9 @@ export interface paths {
          * Subscribe a customer to a plan
          * @description **In short:** One call moves a customer to a plan of a subscription product — new subscription, upgrade, downgrade, cancel to the free plan, or undo a pending change.
          *
-         *     `customerId` is Itaja's id or your own. `outcome` says what happened:
+         *     `customerId` is Itaja's id or your own. Name the plan with **exactly one** of `plan` — the name you declared it under in code (`PUT /v1/catalog`), compared trimmed and case-insensitively among the plans on sale — or `planId`, Itaja's id (a plan made in the dashboard). Both or neither: `422 VALIDATION_ERROR`. `productId` disambiguates a name sold by several products. `data.plan` echoes the plan targeted (`id`, `name`, `productId`).
+         *
+         *     `outcome` says what happened:
          *
          *     - `payment_required` — no subscription yet, paid plan: send the customer to `paymentUrl` (bound to this customer, it returns to your `successUrl` / `cancelUrl`). The URL expires at `paymentUrlExpiresAt` (24 h): past it the pay page answers `410`, call `subscribe` again. Nothing is created until the first period is paid.
          *     - `on_default_plan` — no subscription, the product's default (free) plan: nothing is written, the customer is on it.
@@ -961,7 +963,7 @@ export interface paths {
          *     - `pending_cleared` — the current plan while a change or a cancel was pending: both are undone and the next period is billed again.
          *     - `unchanged` — nothing to do; a replay of the same call lands here.
          *
-         *     `404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.
+         *     `404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach (and for a `plan` name no plan on sale carries — a plan renamed in code is a new plan, the old name answers 404). `409 AMBIGUOUS_PLAN` when a key not scoped to a product names a plan sold by several products: pass `productId`. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.
          */
         post: operations["postApiV1SubscriptionsSubscribe"];
         delete?: never;
@@ -7016,7 +7018,12 @@ export interface operations {
             content: {
                 "application/json": {
                     customerId: string;
-                    planId: string;
+                    /** @description The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`. */
+                    plan?: string;
+                    /** @description Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`. */
+                    planId?: string;
+                    /** @description Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`. */
+                    productId?: string;
                     /** Format: uri */
                     successUrl?: string;
                     /** Format: uri */
@@ -7024,7 +7031,12 @@ export interface operations {
                 };
                 "application/x-www-form-urlencoded": {
                     customerId: string;
-                    planId: string;
+                    /** @description The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`. */
+                    plan?: string;
+                    /** @description Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`. */
+                    planId?: string;
+                    /** @description Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`. */
+                    productId?: string;
                     /** Format: uri */
                     successUrl?: string;
                     /** Format: uri */
@@ -7032,7 +7044,12 @@ export interface operations {
                 };
                 "multipart/form-data": {
                     customerId: string;
-                    planId: string;
+                    /** @description The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`. */
+                    plan?: string;
+                    /** @description Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`. */
+                    planId?: string;
+                    /** @description Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`. */
+                    productId?: string;
                     /** Format: uri */
                     successUrl?: string;
                     /** Format: uri */
@@ -7112,6 +7129,11 @@ export interface operations {
                                 effectiveAt: string;
                             } | null;
                             onDefaultPlan: boolean;
+                            plan: {
+                                id: string;
+                                name: string;
+                                productId: string;
+                            };
                         };
                     };
                 };
@@ -7744,8 +7766,7 @@ export interface operations {
                         /** @constant */
                         type: "subscription";
                         plans: {
-                            /** @description Your own identifier for this item. Unique within its kind. */
-                            id: string;
+                            /** @description The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`. */
                             name: string;
                             description?: string | null;
                             price?: {
@@ -7818,8 +7839,7 @@ export interface operations {
                         /** @constant */
                         type: "subscription";
                         plans: {
-                            /** @description Your own identifier for this item. Unique within its kind. */
-                            id: string;
+                            /** @description The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`. */
                             name: string;
                             description?: string | null;
                             price?: {
@@ -7892,8 +7912,7 @@ export interface operations {
                         /** @constant */
                         type: "subscription";
                         plans: {
-                            /** @description Your own identifier for this item. Unique within its kind. */
-                            id: string;
+                            /** @description The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`. */
                             name: string;
                             description?: string | null;
                             price?: {

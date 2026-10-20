@@ -60,13 +60,13 @@ export = feature("export", "boolean")
 app = group("app", "My App")
 
 free = plan(
-    "free", app,
+    "Free", app,
     default=True,  # everyone starts here, no payment
     includes=[messages(limit=100, reset="month")],
 )
 
 pro = plan(
-    "pro", app,
+    "Pro", app,
     price={"amount": 5000, "currency": "XOF", "interval": "month"},
     trial_days=7,
     includes=[messages(limit=2000, reset="month"), export()],
@@ -79,7 +79,7 @@ itaja = create_itaja(
 )
 ```
 
-Your ids (`"pro"`, `"messages"`) are yours. Amounts are in **major units**
+Your ids (`"app"`, `"messages"`) are yours; a plan has no id, its name (`"Pro"`) identifies it. Amounts are in **major units**
 (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — an
 undeclared feature, two default plans, a paid plan without a price, an invalid
 id — raise `ItajaConfigError` as soon as the module is imported.
@@ -189,13 +189,16 @@ The example above is the whole declaration. Around it:
 
 ```python
 team = plan(
-    "team", app,
+    "Team", app,
     price={"amount": 15000, "currency": "XOF", "interval": "month"},
     includes=[messages(limit=20000, reset="month"), export()],
 )
 ```
 
 - `interval`: `week` · `month` · `quarter` · `year`. `reset` on a quota: `day` · `week` · `month` · `year`.
+- A plan is identified by its **name** inside its group (`"Pro"`, compared case-insensitively,
+  extra whitespace ignored): Itaja assigns the system id. Renaming a plan creates a new plan and
+  archives the old one. Groups (products), credit packs and licences keep their own `id`.
 - A plan without a `price` must be `default=True`; a group has at most one default.
 - `trial_days` gives a free period before the first charge.
 
@@ -206,8 +209,8 @@ itaja.subscriptions.cancel(subscription_id)  # at period end
 
 Events: `invoice.paid` · `invoice.payment_failed` · `subscription.past_due` · `subscription.canceled`.
 
-> **Coming with the API:** `itaja.subscribe()` (new, upgrade, downgrade,
-> cancel-to-free in one call), `check()` and `report()` for entitlements exist and
+> **Coming with the API:** `itaja.subscribe(customer_id=..., plan="Pro")` (new, upgrade, downgrade,
+> cancel-to-free in one call, the plan named as in your catalogue), `check()` and `report()` for entitlements exist and
 > raise `NOT_YET_AVAILABLE` until the API serves them
 > ([itaja-services #465, #466](https://github.com/itaja/itaja-services/issues/465)).
 
