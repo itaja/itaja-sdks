@@ -22,6 +22,13 @@ K1. A catalogue id is sent instead of Itaja's product id, or the map is stale af
 K2. A credit movement sends a body ``idempotencyKey`` different from the header's.
 K3. ``subscribe`` / ``check`` / ``report`` pretend to work.
 K4. An id with a slash or a space breaks the URL.
+R1. The return URLs never reach the API: ``credits.buy`` rebuilds its body from a fixed
+    list of fields, so one missing from it is silently dropped and the payer stays on
+    Itaja's return page.
+R2. An outcome borrows another's address (two fields swapped, or a snake_case name
+    not mapped to the API's camelCase), or an omitted one is sent as ``null`` (the API
+    refuses an empty URL).
+R3. ``checkout.create`` drops or renames the return URLs it receives.
 """
 
 from __future__ import annotations
@@ -299,6 +306,66 @@ def test_k2_buy_picks_the_pack_by_its_catalogue_id_and_refuses_an_unknown_one() 
     assert r.requests[-1].url.path == "/api/v1/products/prd_77/credit-packs/pck_b/checkout"
     with pytest.raises(ItajaNotFoundError):
         r.client().credits.buy(pack="huge", customer_id="cus_1", home_url="https://shop.test", product="tokens")
+
+
+def _packs_api(request: httpx.Request) -> httpx.Response:
+    if request.url.path.endswith("/credit-packs"):
+        return ok({"packs": [{"id": "pck_a", "catalogKey": "small"}]})
+    return ok({"checkoutUrl": "https://pay.test/c/2"}, 201)
+
+
+def test_r1_r2_buy_sends_each_return_url_under_its_api_name() -> None:
+    r = Recorder(_packs_api)
+    r.client().credits.buy(
+        pack="small",
+        customer_id="cus_1",
+        home_url="https://shop.test/back",
+        product_id="prd_77",
+        success_url="https://shop.test/paid?order=1042#top",
+        failure_url="https://shop.test/failed",
+        cancel_url="https://shop.test/cart",
+    )
+    assert r.requests[-1].url.path == "/api/v1/products/prd_77/credit-packs/pck_a/checkout"
+    assert json.loads(r.requests[-1].content) == {
+        "customerId": "cus_1",
+        "homeUrl": "https://shop.test/back",
+        "successUrl": "https://shop.test/paid?order=1042#top",
+        "failureUrl": "https://shop.test/failed",
+        "cancelUrl": "https://shop.test/cart",
+    }
+
+
+def test_r2_an_omitted_return_url_is_absent_never_null() -> None:
+    r = Recorder(_packs_api)
+    r.client().credits.buy(
+        pack="small",
+        customer_id="cus_1",
+        home_url="https://shop.test/back",
+        product_id="prd_77",
+        cancel_url="https://shop.test/cart",
+    )
+    assert json.loads(r.requests[-1].content) == {
+        "customerId": "cus_1",
+        "homeUrl": "https://shop.test/back",
+        "cancelUrl": "https://shop.test/cart",
+    }
+
+
+def test_r3_checkout_create_sends_the_return_urls_as_given() -> None:
+    r = Recorder([ok({"id": "chk_1"}, 201)])
+    r.client().checkout.create(
+        homeUrl="https://shop.test/back",
+        successUrl="https://shop.test/paid",
+        failureUrl="https://shop.test/failed",
+        cancelUrl="https://shop.test/cart",
+    )
+    assert r.requests[0].url.path == "/api/v1/checkout-sessions"
+    assert json.loads(r.requests[0].content) == {
+        "homeUrl": "https://shop.test/back",
+        "successUrl": "https://shop.test/paid",
+        "failureUrl": "https://shop.test/failed",
+        "cancelUrl": "https://shop.test/cart",
+    }
 
 
 def test_k3_the_calls_the_api_does_not_serve_yet_say_so() -> None:

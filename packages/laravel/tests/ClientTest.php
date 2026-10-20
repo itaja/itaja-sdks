@@ -20,6 +20,14 @@
  * K7. A customer id with a slash or a space breaks the URL.
  * K8. `with(apiKey:, baseUrl:)` is ignored, or changes the shared client the rest
  *     of the app uses (a tenant's key leaks into another request).
+ * K9. The return URLs never reach the API: `buy` rebuilds its body from a fixed
+ *     list of fields, so one missing from it is silently dropped and the payer
+ *     stays on Itaja's return page.
+ * K10. An outcome borrows another's address (two fields swapped), or an omitted
+ *     one is sent as `null` (the API refuses an empty URL with 422).
+ * K11. Adding the return URLs shifts `buy`'s positional parameters: an existing
+ *     positional call sends its reference or language as a return URL.
+ * K12. `checkout()->create()` drops or renames the return URLs it receives.
  */
 
 namespace Itaja\Laravel\Tests;
@@ -175,6 +183,92 @@ final class ClientTest extends TestCase
         $this->assertSame('https://pay.test/c/1', $out['checkoutUrl']);
         $this->expectException(NotFoundException::class);
         ItajaFacade::credits()->buy('huge', 'cus_1', 'https://shop.test/thanks', product: 'tokens');
+    }
+
+    private function fakePackCheckout(): void
+    {
+        Http::fake([
+            '*/credit-packs' => $this->ok(['packs' => [['id' => 'pck_a', 'catalogKey' => 'small']]]),
+            '*/credit-packs/pck_a/checkout' => $this->ok(['checkoutUrl' => 'https://pay.test/c/2'], 201),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function lastBody(): array
+    {
+        $sent = $this->sent();
+
+        return json_decode(end($sent)->body(), true);
+    }
+
+    public function test_k9_k10_buy_sends_each_return_url_under_its_own_name(): void
+    {
+        $this->fakePackCheckout();
+
+        ItajaFacade::credits()->buy(
+            pack: 'small',
+            customerId: 'cus_1',
+            homeUrl: 'https://shop.test/back',
+            productId: 'prd_77',
+            successUrl: 'https://shop.test/paid?order=1042#top',
+            failureUrl: 'https://shop.test/failed',
+            cancelUrl: 'https://shop.test/cart',
+        );
+
+        $this->assertSame([
+            'customerId' => 'cus_1',
+            'homeUrl' => 'https://shop.test/back',
+            'successUrl' => 'https://shop.test/paid?order=1042#top',
+            'failureUrl' => 'https://shop.test/failed',
+            'cancelUrl' => 'https://shop.test/cart',
+        ], $this->lastBody());
+    }
+
+    public function test_k10_an_omitted_return_url_is_absent_never_null(): void
+    {
+        $this->fakePackCheckout();
+
+        ItajaFacade::credits()->buy(pack: 'small', customerId: 'cus_1', homeUrl: 'https://shop.test/back', productId: 'prd_77', failureUrl: 'https://shop.test/failed');
+
+        $this->assertSame([
+            'customerId' => 'cus_1',
+            'homeUrl' => 'https://shop.test/back',
+            'failureUrl' => 'https://shop.test/failed',
+        ], $this->lastBody());
+    }
+
+    public function test_k11_an_existing_positional_call_keeps_its_meaning(): void
+    {
+        $this->fakePackCheckout();
+
+        ItajaFacade::credits()->buy('small', 'cus_1', 'https://shop.test/back', null, 'prd_77', 'order-1042', 'fr');
+
+        $this->assertSame([
+            'customerId' => 'cus_1',
+            'homeUrl' => 'https://shop.test/back',
+            'reference' => 'order-1042',
+            'language' => 'fr',
+        ], $this->lastBody());
+    }
+
+    public function test_k12_checkout_create_sends_the_return_urls_as_given(): void
+    {
+        Http::fake(['*/checkout-sessions' => $this->ok(['id' => 'chk_1'], 201)]);
+
+        ItajaFacade::checkout()->create([
+            'homeUrl' => 'https://shop.test/back',
+            'successUrl' => 'https://shop.test/paid',
+            'failureUrl' => 'https://shop.test/failed',
+            'cancelUrl' => 'https://shop.test/cart',
+        ]);
+
+        $this->assertStringEndsWith('/api/v1/checkout-sessions', $this->sent()[0]->url());
+        $this->assertSame([
+            'homeUrl' => 'https://shop.test/back',
+            'successUrl' => 'https://shop.test/paid',
+            'failureUrl' => 'https://shop.test/failed',
+            'cancelUrl' => 'https://shop.test/cart',
+        ], $this->lastBody());
     }
 
     public function test_k6_the_calls_the_api_does_not_serve_yet_say_so(): void

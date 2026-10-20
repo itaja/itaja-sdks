@@ -938,6 +938,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/subscriptions/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe a customer to a plan
+         * @description **In short:** One call moves a customer to a plan of a subscription product — new subscription, upgrade, downgrade, cancel to the free plan, or undo a pending change.
+         *
+         *     `customerId` is Itaja's id or your own. `outcome` says what happened:
+         *
+         *     - `payment_required` — no subscription yet, paid plan: send the customer to `paymentUrl` (bound to this customer, it returns to your `successUrl` / `cancelUrl`). The URL expires at `paymentUrlExpiresAt` (24 h): past it the pay page answers `410`, call `subscribe` again. Nothing is created until the first period is paid.
+         *     - `on_default_plan` — no subscription, the product's default (free) plan: nothing is written, the customer is on it.
+         *     - `upgrade_pending` — a higher plan: the prorated difference is invoiced now and payable at `paymentUrl`; the new plan applies once it is paid.
+         *     - `change_scheduled` — a lower plan (or any change during a free trial): applied at `scheduledChange.effectiveAt`, the next period is billed at the new price.
+         *     - `cancel_scheduled` — the default plan: the subscription ends at the end of the paid period.
+         *     - `pending_cleared` — the current plan while a change or a cancel was pending: both are undone and the next period is billed again.
+         *     - `unchanged` — nothing to do; a replay of the same call lands here.
+         *
+         *     `404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.
+         */
+        post: operations["postApiV1SubscriptionsSubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/subscriptions": {
         parameters: {
             query?: never;
@@ -3462,6 +3494,9 @@ export interface operations {
                 "application/json": {
                     customerId: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     reference?: string;
                     language?: string;
                 } & {
@@ -3470,6 +3505,9 @@ export interface operations {
                 "application/x-www-form-urlencoded": {
                     customerId: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     reference?: string;
                     language?: string;
                 } & {
@@ -3478,6 +3516,9 @@ export interface operations {
                 "multipart/form-data": {
                     customerId: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     reference?: string;
                     language?: string;
                 } & {
@@ -6729,6 +6770,9 @@ export interface operations {
                 "application/json": {
                     currency?: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     description?: string;
                     customer?: {
                         email?: string;
@@ -6751,6 +6795,9 @@ export interface operations {
                 "application/x-www-form-urlencoded": {
                     currency?: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     description?: string;
                     customer?: {
                         email?: string;
@@ -6773,6 +6820,9 @@ export interface operations {
                 "multipart/form-data": {
                     currency?: string;
                     homeUrl: string;
+                    successUrl?: string;
+                    failureUrl?: string;
+                    cancelUrl?: string;
                     description?: string;
                     customer?: {
                         email?: string;
@@ -6936,6 +6986,175 @@ export interface operations {
                                 paidByMerchant: number;
                             };
                         };
+                    };
+                };
+            };
+            /** @description Response for status 422 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: false;
+                        error: string;
+                        code?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1SubscriptionsSubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    customerId: string;
+                    planId: string;
+                    /** Format: uri */
+                    successUrl?: string;
+                    /** Format: uri */
+                    cancelUrl?: string;
+                };
+                "application/x-www-form-urlencoded": {
+                    customerId: string;
+                    planId: string;
+                    /** Format: uri */
+                    successUrl?: string;
+                    /** Format: uri */
+                    cancelUrl?: string;
+                };
+                "multipart/form-data": {
+                    customerId: string;
+                    planId: string;
+                    /** Format: uri */
+                    successUrl?: string;
+                    /** Format: uri */
+                    cancelUrl?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Response for status 200 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                        data: {
+                            /**
+                             * @default payment_required
+                             * @enum {string}
+                             */
+                            outcome: "payment_required" | "on_default_plan" | "upgrade_pending" | "change_scheduled" | "cancel_scheduled" | "pending_cleared" | "unchanged";
+                            subscription: ({
+                                id: string;
+                                status: string;
+                                collectionMode: string;
+                                quantity: number;
+                                currency: string;
+                                trialEndsAt: string | null;
+                                currentPeriodStart: string;
+                                currentPeriodEnd: string;
+                                cancelAtPeriodEnd: boolean;
+                                canceledAt: string | null;
+                                pausedAt: string | null;
+                                endedAt: string | null;
+                                createdAt: string;
+                                customer: {
+                                    id: string;
+                                    name: string;
+                                    email: string;
+                                };
+                                plan: {
+                                    id: string;
+                                    name: string;
+                                    amount: number;
+                                    interval: string;
+                                    intervalCount: number;
+                                };
+                                product: {
+                                    id: string;
+                                    name: string;
+                                };
+                            } & {
+                                invoices: {
+                                    id: string;
+                                    number: number | null;
+                                    status: string;
+                                    total: number | null;
+                                    currency: string;
+                                    periodStart: string | null;
+                                    periodEnd: string | null;
+                                    shouldBePaidBefore: string;
+                                    paidAt: string | null;
+                                    voidedAt: string | null;
+                                }[];
+                            }) | null;
+                            paymentUrl: string | null;
+                            paymentUrlExpiresAt: string | null;
+                            scheduledChange: {
+                                /**
+                                 * @default plan_change
+                                 * @enum {string}
+                                 */
+                                type: "plan_change" | "cancel";
+                                planId: string;
+                                effectiveAt: string;
+                            } | null;
+                            onDefaultPlan: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Response for status 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: false;
+                        error: string;
+                        code?: string;
+                    };
+                };
+            };
+            /** @description Response for status 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: false;
+                        error: string;
+                        code?: string;
+                    };
+                };
+            };
+            /** @description Response for status 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: false;
+                        error: string;
+                        code?: string;
                     };
                 };
             };

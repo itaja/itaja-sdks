@@ -198,7 +198,13 @@ const large = creditPack({ id: "large", of: tokens, credits: 1000, price: { amou
 ```
 
 ```ts
-const { checkoutUrl } = await itaja.credits.buy({ product: "tokens", pack: "small", customerId, homeUrl });
+const { checkoutUrl } = await itaja.credits.buy({
+  product: "tokens",
+  pack: "small",
+  customerId,
+  homeUrl,
+  successUrl: "https://shop.example/credits/thanks", // optional, as on checkout.create
+});
 await itaja.credits.consume({ product: "tokens", customerId, amount: 3 });
 await itaja.credits.balance({ product: "tokens", customerId });
 ```
@@ -236,10 +242,19 @@ Nothing to declare: create a checkout for an amount, send the customer to
 ```ts
 const { checkoutUrl } = await itaja.checkout.create({
   homeUrl: "https://shop.example/thanks",
+  successUrl: "https://shop.example/order/paid", // optional
+  cancelUrl: "https://shop.example/cart",        // optional
   currency: "XOF",
   lineItems: [{ name: "Sandals", quantity: 1, unitPrice: 5000 }],
 });
 ```
+
+The payer comes back to `homeUrl` by default. Pass `successUrl`, `failureUrl`
+and/or `cancelUrl` (optional, absolute `https`, on a live key a domain verified
+for your account) to send each outcome to its own page; one left out keeps
+Itaja's return page. Itaja adds `itaja_checkout_id` and `itaja_status`
+(`success | failure | cancel`) to the address. The redirect is payer-visible:
+confirm payment from the webhook, never from it.
 
 Payment links are a dashboard feature: no builder or endpoint here creates one.
 

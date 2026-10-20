@@ -15,6 +15,14 @@
  * T6. The mode is taken from an option instead of the key prefix.
  * T7. A product named by its catalogue id is not resolved to Itaja's id, or a
  *     product the push did not create is guessed instead of refused.
+ * T8. The return URLs never reach the API: `credits.buy` rebuilds its body from
+ *     a fixed list of fields, so one missing from it is silently dropped and the
+ *     payer stays on Itaja's return page.
+ * T9. An outcome borrows another's address: two fields swapped on the way, or an
+ *     omitted one sent as `null` / `""` (the API refuses an empty URL with 422).
+ * T10. The generated types lag the spec and `checkout.create` refuses the fields
+ *     at compile time (caught by `pnpm generate:check` and `pnpm typecheck`; the
+ *     calls below are typed, with no cast).
  */
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -155,6 +163,58 @@ describe("transport", () => {
     const error = await itaja.credits.balance({ product: "nope" as "tokens", customerId: "cus_1" }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ItajaNotFoundError);
     expect(error).toMatchObject({ code: "CATALOG_PRODUCT_NOT_PUSHED" });
+  });
+
+  it("T8/T9 — checkout.create sends each return URL under its own name", async () => {
+    script = [{ status: 201, body: { success: true, data: { id: "chk_3" } } }];
+    await client().checkout.create({
+      homeUrl: "https://shop.example/back",
+      successUrl: "https://shop.example/paid?order=1042#top",
+      failureUrl: "https://shop.example/failed",
+      cancelUrl: "https://shop.example/cart",
+    });
+    expect(JSON.parse(seen[0]!.body)).toEqual({
+      homeUrl: "https://shop.example/back",
+      successUrl: "https://shop.example/paid?order=1042#top",
+      failureUrl: "https://shop.example/failed",
+      cancelUrl: "https://shop.example/cart",
+    });
+  });
+
+  it("T8/T9 — credits.buy forwards the return URLs to the pack checkout", async () => {
+    script = [
+      { status: 200, body: { success: true, data: { packs: [{ id: "pck_small", catalogKey: "small" }] } } },
+      { status: 201, body: { success: true, data: { checkoutUrl: "https://pay.example/c/1" } } },
+    ];
+    await client().credits.buy({
+      productId: "prd_tok",
+      pack: "small",
+      customerId: "cus_1",
+      homeUrl: "https://shop.example/back",
+      successUrl: "https://shop.example/paid",
+      failureUrl: "https://shop.example/failed",
+      cancelUrl: "https://shop.example/cart",
+    });
+    expect(seen[1]!.url).toBe("/api/v1/products/prd_tok/credit-packs/pck_small/checkout");
+    expect(JSON.parse(seen[1]!.body)).toEqual({
+      customerId: "cus_1",
+      homeUrl: "https://shop.example/back",
+      successUrl: "https://shop.example/paid",
+      failureUrl: "https://shop.example/failed",
+      cancelUrl: "https://shop.example/cart",
+    });
+  });
+
+  it("T9 — an omitted return URL is absent from the body, never null or empty", async () => {
+    script = [
+      { status: 200, body: { success: true, data: { packs: [{ id: "pck_small", catalogKey: "small" }] } } },
+      { status: 201, body: { success: true, data: { checkoutUrl: "https://pay.example/c/2" } } },
+    ];
+    await client().credits.buy({ productId: "prd_tok", pack: "small", customerId: "cus_1", homeUrl: "https://shop.example/back", successUrl: "https://shop.example/paid" });
+    const body = JSON.parse(seen[1]!.body) as Record<string, unknown>;
+    expect(body).toEqual({ customerId: "cus_1", homeUrl: "https://shop.example/back", successUrl: "https://shop.example/paid" });
+    expect(Object.keys(body)).not.toContain("cancelUrl");
+    expect(Object.keys(body)).not.toContain("failureUrl");
   });
 
   it("subscribe / check / report say plainly they are not served yet", async () => {

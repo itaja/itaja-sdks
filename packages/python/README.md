@@ -225,7 +225,13 @@ large = credit_pack("large", tokens, 1000, {"amount": 8000, "currency": "XOF"})
 ```
 
 ```python
-checkout = itaja.credits.buy(pack="small", customer_id=customer_id, home_url="https://shop.example/thanks", product="tokens")
+checkout = itaja.credits.buy(
+    pack="small",
+    customer_id=customer_id,
+    home_url="https://shop.example/thanks",
+    product="tokens",
+    success_url="https://shop.example/credits/thanks",  # optional, as on checkout.create
+)
 # redirect the buyer to checkout["checkoutUrl"]
 
 itaja.credits.consume(customer_id=customer_id, amount=3, product="tokens")
@@ -264,10 +270,19 @@ Nothing to declare: create a checkout for an amount, send the customer to
 ```python
 checkout = itaja.checkout.create(
     homeUrl="https://shop.example/thanks",
+    successUrl="https://shop.example/order/paid",  # optional
+    cancelUrl="https://shop.example/cart",         # optional
     currency="XOF",
     lineItems=[{"name": "Sandals", "quantity": 1, "unitPrice": 5000}],
 )
 ```
+
+The payer comes back to `homeUrl` by default. Pass `successUrl`, `failureUrl`
+and/or `cancelUrl` (`success_url`… on `credits.buy`) (optional, absolute `https`, on a live key a domain verified
+for your account) to send each outcome to its own page; one left out keeps
+Itaja's return page. Itaja adds `itaja_checkout_id` and `itaja_status`
+(`success | failure | cancel`) to the address. The redirect is payer-visible:
+confirm payment from the webhook, never from it.
 
 Payment links are a dashboard feature: no builder or endpoint here creates one.
 

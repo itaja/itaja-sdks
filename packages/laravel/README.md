@@ -177,7 +177,13 @@ return [
 ```
 
 ```php
-$checkout = Itaja::credits()->buy(pack: 'small', customerId: $id, homeUrl: url('/thanks'), product: 'tokens');
+$checkout = Itaja::credits()->buy(
+    pack: 'small',
+    customerId: $id,
+    homeUrl: url('/thanks'),
+    product: 'tokens',
+    successUrl: url('/credits/thanks'), // optional, as on checkout()->create()
+);
 redirect($checkout['checkoutUrl']);
 
 Itaja::credits()->consume(customerId: $id, amount: 3, product: 'tokens');
@@ -216,10 +222,19 @@ Nothing to declare: create a checkout for an amount, send the customer to
 ```php
 $checkout = Itaja::checkout()->create([
     'homeUrl' => url('/thanks'),
+    'successUrl' => url('/order/paid'), // optional
+    'cancelUrl' => url('/cart'),        // optional
     'currency' => 'XOF',
     'lineItems' => [['name' => 'Sandals', 'quantity' => 1, 'unitPrice' => 5000]],
 ]);
 ```
+
+The payer comes back to `homeUrl` by default. Pass `successUrl`, `failureUrl`
+and/or `cancelUrl` (optional, absolute `https`, on a live key a domain verified
+for your account) to send each outcome to its own page; one left out keeps
+Itaja's return page. Itaja adds `itaja_checkout_id` and `itaja_status`
+(`success | failure | cancel`) to the address. The redirect is payer-visible:
+confirm payment from the `CheckoutPaid` event, never from it.
 
 Payment links are a dashboard feature: no class or endpoint here creates one.
 

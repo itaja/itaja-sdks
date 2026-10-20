@@ -1,6 +1,6 @@
 [project]
 name = "itaja"
-version = "0.1.0"
+version = "0.2.0"
 description = "Itaja for Python servers: declare what you sell in code, push it, mount one webhook route, react to typed events. Django, FastAPI, Flask."
 readme = "README.md"
 license = "MIT"
