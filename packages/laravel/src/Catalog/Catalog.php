@@ -6,89 +6,83 @@ namespace Itaja\Laravel\Catalog;
  * The catalogue in code → the canonical document `PUT /v1/catalog` takes
  * (`spec/catalog.schema.json`). Deterministic: the same declaration gives the
  * same JSON, in declaration order, in every language.
+ *
+ * Every item is identified by its NAME, compared trimmed, inner whitespace
+ * collapsed and case-insensitively. Refused locally, as the API would: two
+ * features of one name, two products of one name (whatever their types), two
+ * plans of one name in a group, two packs of one name in a credits product,
+ * and a plan including a feature the catalogue does not declare.
  */
 final class Catalog
 {
     /**
      * @param  iterable<Feature|Plan|Credits|CreditPack|License>  $items
-     * @return array{features: list<array{id: string, type: string}>, products: list<array<string, mixed>>}
+     * @return array{features: list<array{name: string, type: string}>, products: list<array<string, mixed>>}
      */
     public static function document(iterable $items): array
     {
-        /** @var array<string, array{id: string, type: string}> $features */
+        /** @var array<string, Feature> $features */
         $features = [];
-        /** @var array<string, array{group: Group, plans: list<Plan>}> $groups */
-        $groups = [];
-        /** @var array<string, array{credits: Credits, packs: list<CreditPack>}> $creditProducts */
-        $creditProducts = [];
-        /** @var array<string, License> $licenses */
-        $licenses = [];
-        /** @var list<array{string, string}> $order */
-        $order = [];
+        /** @var array<string, array{kind: string, decl: Group|Credits|License, plans: list<Plan>, packs: list<CreditPack>}> $products */
+        $products = [];
 
-        // By reference: an arrow function would copy the arrays once, and never see what is added later.
-        $taken = static function (string $id) use (&$groups, &$creditProducts, &$licenses): bool {
-            return isset($groups[$id]) || isset($creditProducts[$id]) || isset($licenses[$id]);
+        // By reference: the closure must see, and add to, the products found so far.
+        $product = static function (string $kind, Group|Credits|License $decl) use (&$products): string {
+            $key = Support::normalize($decl->name);
+            if (! isset($products[$key])) {
+                $products[$key] = ['kind' => $kind, 'decl' => $decl, 'plans' => [], 'packs' => []];
+
+                return $key;
+            }
+            $known = $products[$key];
+            // The same product reached twice (a group shared by its plans, credits
+            // and their packs) is one product; two declarations of one name are refused.
+            if ($known['kind'] === $kind && $kind !== 'license' && $known['decl'] == $decl) {
+                return $key;
+            }
+            throw Support::error("Product \"{$decl->name}\" is declared twice (same name as \"{$known['decl']->name}\"): product names are unique across subscriptions, credits and licences, compared trimmed and case-insensitively.");
         };
-        $duplicate = static fn (string $id) => Support::error("Product id \"{$id}\" is used twice in the catalogue (groups, credits and licences share one id space).");
 
         foreach ($items as $item) {
             switch (true) {
                 case $item instanceof Feature:
-                    if (isset($features[$item->id]) && $features[$item->id]['type'] !== $item->type) {
-                        throw Support::error("Feature \"{$item->id}\" is declared twice with different types.");
+                    $key = Support::normalize($item->name);
+                    if (isset($features[$key]) && $features[$key] != $item) {
+                        throw Support::error("Feature \"{$item->name}\" is declared twice (same name as \"{$features[$key]->name}\": feature names are compared trimmed and case-insensitively).");
                     }
-                    $features[$item->id] = ['id' => $item->id, 'type' => $item->type];
+                    $features[$key] = $item;
                     break;
 
                 case $item instanceof Plan:
-                    $gid = $item->group->id;
-                    if (! isset($groups[$gid])) {
-                        if ($taken($gid)) {
-                            throw $duplicate($gid);
-                        }
-                        $groups[$gid] = ['group' => $item->group, 'plans' => []];
-                        $order[] = ['group', $gid];
-                    } elseif ($groups[$gid]['group']->name !== $item->group->name) {
-                        throw Support::error("Group \"{$gid}\" is declared with two different names.");
-                    }
-                    foreach ($groups[$gid]['plans'] as $existing) {
+                    $key = $product('group', $item->group);
+                    $groupName = $products[$key]['decl']->name;
+                    foreach ($products[$key]['plans'] as $existing) {
                         if ($existing->key() === $item->key()) {
-                            throw Support::error("Plan \"{$item->name}\" is declared twice in group \"{$gid}\" (as \"{$existing->name}\"): a plan's name is its identity, compared case-insensitively and ignoring extra spaces.");
+                            throw Support::error("Plan \"{$item->name}\" is declared twice in group \"{$groupName}\" (same name as \"{$existing->name}\": plan names are compared trimmed and case-insensitively).");
                         }
                         if ($item->default && $existing->default) {
-                            throw Support::error("Group \"{$gid}\" has two default plans; keep one.");
+                            throw Support::error("Group \"{$groupName}\" has two default plans; keep one.");
                         }
                     }
-                    $groups[$gid]['plans'][] = $item;
+                    $products[$key]['plans'][] = $item;
                     break;
 
                 case $item instanceof Credits:
                 case $item instanceof CreditPack:
-                    $credits = $item instanceof Credits ? $item : $item->of;
-                    if (! isset($creditProducts[$credits->id])) {
-                        if ($taken($credits->id)) {
-                            throw $duplicate($credits->id);
-                        }
-                        $creditProducts[$credits->id] = ['credits' => $credits, 'packs' => []];
-                        $order[] = ['credits', $credits->id];
-                    }
+                    $key = $product('credits', $item instanceof Credits ? $item : $item->of);
                     if ($item instanceof CreditPack) {
-                        foreach ($creditProducts[$credits->id]['packs'] as $existing) {
-                            if ($existing->id === $item->id) {
-                                throw Support::error("Credit pack \"{$item->id}\" is declared twice in \"{$credits->id}\".");
+                        $creditsName = $products[$key]['decl']->name;
+                        foreach ($products[$key]['packs'] as $existing) {
+                            if (Support::normalize($existing->name) === Support::normalize($item->name)) {
+                                throw Support::error("Credit pack \"{$item->name}\" is declared twice in \"{$creditsName}\" (same name as \"{$existing->name}\": pack names are compared trimmed and case-insensitively).");
                             }
                         }
-                        $creditProducts[$credits->id]['packs'][] = $item;
+                        $products[$key]['packs'][] = $item;
                     }
                     break;
 
                 case $item instanceof License:
-                    if ($taken($item->id)) {
-                        throw $duplicate($item->id);
-                    }
-                    $licenses[$item->id] = $item;
-                    $order[] = ['license', $item->id];
+                    $product('license', $item);
                     break;
 
                 default:
@@ -96,64 +90,60 @@ final class Catalog
             }
         }
 
-        $products = [];
-        foreach ($order as [$kind, $id]) {
-            if ($kind === 'group') {
-                ['group' => $group, 'plans' => $plans] = $groups[$id];
+        $out = [];
+        foreach ($products as ['decl' => $decl, 'plans' => $plans, 'packs' => $packs]) {
+            if ($decl instanceof Group) {
                 foreach ($plans as $plan) {
                     foreach ($plan->includes as $inclusion) {
-                        if (! isset($features[$inclusion['feature']])) {
+                        if (! isset($features[Support::normalize($inclusion['feature'])])) {
                             throw Support::error("Plan \"{$plan->name}\" includes feature \"{$inclusion['feature']}\", which the catalogue does not declare. Add the feature to the catalogue.");
                         }
                     }
                 }
-                $products[] = array_filter([
-                    'id' => $group->id,
+                $out[] = array_filter([
                     'type' => 'subscription',
-                    'name' => $group->name,
-                    'description' => $group->description,
+                    'name' => $decl->name,
+                    'description' => $decl->description,
                     'plans' => array_map(fn (Plan $p): array => array_filter([
                         'name' => $p->name,
                         'description' => $p->description,
-                        'price' => $p->price,
-                        'trial' => $p->trialDays !== null ? ['days' => $p->trialDays] : null,
                         'default' => $p->default ? true : null,
+                        'trial' => $p->trialDays !== null ? ['days' => $p->trialDays] : null,
+                        'price' => $p->price,
                         'includes' => $p->includes,
                     ], fn ($v) => $v !== null), $plans),
                 ], fn ($v) => $v !== null);
-            } elseif ($kind === 'credits') {
-                ['credits' => $credits, 'packs' => $packs] = $creditProducts[$id];
+            } elseif ($decl instanceof Credits) {
                 if ($packs === []) {
-                    throw Support::error("Credits \"{$credits->id}\" has no pack: declare at least one CreditPack for it.");
+                    throw Support::error("Credits \"{$decl->name}\" has no pack: declare at least one CreditPack for it.");
                 }
-                $products[] = array_filter([
-                    'id' => $credits->id,
+                $out[] = array_filter([
                     'type' => 'credits',
-                    'name' => $credits->name,
-                    'description' => $credits->description,
-                    'coinName' => $credits->coinName,
+                    'name' => $decl->name,
+                    'description' => $decl->description,
+                    'coinName' => $decl->coinName,
                     'packs' => array_map(fn (CreditPack $p): array => array_filter([
-                        'id' => $p->id,
-                        'label' => $p->label,
+                        'name' => $p->name,
                         'description' => $p->description,
                         'credits' => $p->credits,
                         'price' => $p->price,
                     ], fn ($v) => $v !== null), $packs),
                 ], fn ($v) => $v !== null);
             } else {
-                $l = $licenses[$id];
-                $products[] = array_filter([
-                    'id' => $l->id,
-                    'name' => $l->name,
-                    'description' => $l->description,
-                    'price' => $l->price,
-                    'devices' => $l->devices,
-                    'duration' => $l->duration,
+                $out[] = array_filter([
                     'type' => 'license',
+                    'name' => $decl->name,
+                    'description' => $decl->description,
+                    'devices' => $decl->devices,
+                    'duration' => $decl->duration,
+                    'price' => $decl->price,
                 ], fn ($v, $k) => $v !== null || $k === 'devices', ARRAY_FILTER_USE_BOTH);
             }
         }
 
-        return ['features' => array_values($features), 'products' => $products];
+        return [
+            'features' => array_values(array_map(fn (Feature $f): array => ['name' => $f->name, 'type' => $f->type], $features)),
+            'products' => $out,
+        ];
     }
 }

@@ -7,20 +7,30 @@ use Itaja\Laravel\Exceptions\ConfigException;
 /** @internal */
 final class Support
 {
-    public const ID_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/';
+    /** The longest name the API accepts, for every catalogue item. */
+    public const NAME_MAX_LENGTH = 200;
 
-    public static function assertId(string $id, string $what): void
+    /**
+     * A catalogue item's identity: Unicode NFC, trimmed, inner whitespace
+     * collapsed to one space, lower-cased, exactly as the API compares names
+     * (and stores them as `catalogKey`).
+     */
+    public static function normalize(string $name): string
     {
-        if (preg_match(self::ID_PATTERN, $id) !== 1) {
-            throw self::error("Invalid {$what} id \"{$id}\": 1 to 64 letters, digits, \"_\" or \"-\", starting with a letter or a digit.");
-        }
+        $nfc = \Normalizer::normalize($name, \Normalizer::FORM_C);
+
+        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', is_string($nfc) ? $nfc : $name)));
     }
 
-    public static function humanize(string $id): string
+    public static function assertName(string $name, string $what, string $example): void
     {
-        $words = trim((string) preg_replace('/[_-]+/', ' ', $id));
-
-        return mb_strtoupper(mb_substr($words, 0, 1)).mb_substr($words, 1);
+        if (preg_match('/\S/u', $name) !== 1) {
+            throw self::error("A {$what} needs a name: it is its identity (there is no id), e.g. {$example}.");
+        }
+        $length = mb_strlen($name);
+        if ($length > self::NAME_MAX_LENGTH) {
+            throw self::error("The {$what} name \"".mb_substr($name, 0, 40)."…\" is {$length} characters long: at most ".self::NAME_MAX_LENGTH.'.');
+        }
     }
 
     /** @param  array{amount: int|float, currency: string}  $price */

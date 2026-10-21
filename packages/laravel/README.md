@@ -24,11 +24,11 @@ A free plan and a paid plan, with a quota that depends on the plan. Create
 use Itaja\Laravel\Catalog\{Feature, Group, Plan};
 
 // What the customer can do
-$messages = Feature::metered('messages');
-$export = Feature::boolean('export');
+$messages = Feature::metered('Messages');
+$export = Feature::boolean('Export');
 
 // One customer holds one plan of a group
-$app = Group::make('app', 'My App');
+$app = Group::make('My App');
 
 return [
     $messages,
@@ -47,14 +47,16 @@ return [
 ];
 ```
 
-A plan is identified by its **name** (`'Free'`, `'Pro'`), compared case-insensitively
-and ignoring extra spaces within its group: Itaja assigns the plan's system id, and
-renaming a plan creates a new plan and archives the old one. Products, features,
-credit packs and licences keep the ids you give them (`'app'`, `'messages'`).
-Amounts are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — an
-undeclared feature, two default plans, a paid plan without a price, two plans with
-the same name, an invalid id —
-throw a `ConfigException` as soon as the file loads.
+Everything is identified by its **name** — there is no id to choose. Names are
+compared trimmed, inner spaces collapsed and case-insensitively (`'Pro'` and
+`' pro '` are the same plan). Product names are unique across all your products,
+feature names across your features, plan names within their group, pack names
+within their credits product. Rename an item and you declare a new one; the old
+one is archived. Amounts are in **major units** (`5000` XOF, `9.99` EUR), as in
+the API. Mistakes the API would refuse — a blank or over-long name (200
+characters at most), two items of one name, an undeclared feature, two default
+plans, a paid plan without a price — throw a `ConfigException` as soon as the
+file loads.
 
 ### 2. Push it
 
@@ -160,8 +162,9 @@ Itaja::subscriptions()->cancel($subscriptionId); // at period end
 
 Events: `InvoicePaid` · `InvoicePaymentFailed` · `SubscriptionPastDue` · `SubscriptionCanceled`.
 
-> **Coming with the API:** `Itaja::subscribe()` (new, upgrade, downgrade, cancel-to-free
-> in one call), `check()` and `report()` for entitlements exist and throw
+> **Coming with the API:** `Itaja::subscribe($customerId, 'Pro', product: 'My App')` (new,
+> upgrade, downgrade, cancel-to-free in one call; `product` optional, to pick between
+> products that sell a plan of that name), `check()` and `report()` for entitlements exist and throw
 > `NOT_YET_AVAILABLE` until the API serves them
 > ([itaja-services #465, #466](https://github.com/itaja/itaja-services/issues/465)).
 
@@ -172,26 +175,26 @@ A currency your app spends as the customer uses it, sold in packs.
 ```php
 use Itaja\Laravel\Catalog\{CreditPack, Credits};
 
-$tokens = Credits::make('tokens', 'AI tokens', coinName: 'Tokens');
+$tokens = Credits::make('AI tokens', coinName: 'Tokens');
 
 return [
-    CreditPack::make('small', $tokens, 100, ['amount' => 1000, 'currency' => 'XOF']),
-    CreditPack::make('large', $tokens, 1000, ['amount' => 8000, 'currency' => 'XOF']),
+    CreditPack::make('100 tokens', $tokens, 100, ['amount' => 1000, 'currency' => 'XOF']),
+    CreditPack::make('1000 tokens', $tokens, 1000, ['amount' => 8000, 'currency' => 'XOF']),
 ];
 ```
 
 ```php
 $checkout = Itaja::credits()->buy(
-    pack: 'small',
+    pack: '100 tokens', // the pack's name, as the buyer reads it
     customerId: $id,
     homeUrl: url('/thanks'),
-    product: 'tokens',
+    product: 'AI tokens',
     successUrl: url('/credits/thanks'), // optional, as on checkout()->create()
 );
 redirect($checkout['checkoutUrl']);
 
-Itaja::credits()->consume(customerId: $id, amount: 3, product: 'tokens');
-Itaja::credits()->balance(customerId: $id, product: 'tokens');
+Itaja::credits()->consume(customerId: $id, amount: 3, product: 'AI tokens');
+Itaja::credits()->balance(customerId: $id, product: 'AI tokens');
 ```
 
 Events: `CreditsGranted` · `CreditsConsumed` · `CreditsExpired` · `CreditsLow` · `CreditsClawedBack`.
@@ -203,7 +206,7 @@ Software that unlocks on a number of devices.
 ```php
 use Itaja\Laravel\Catalog\License;
 
-License::make('desktop', 'Desktop app',
+License::make('Desktop app',
     price: ['amount' => 25000, 'currency' => 'XOF'],
     devices: 3,                // null = unlimited
     duration: 'days-365',      // 'lifetime' · 'days-N' · 'from-first-activation-days-N'
@@ -211,8 +214,8 @@ License::make('desktop', 'Desktop app',
 ```
 
 ```php
-Itaja::licenses()->issue(product: 'desktop', customerId: $id);
-Itaja::licenses()->revoke(keyId: $keyId, product: 'desktop', reason: 'chargeback');
+Itaja::licenses()->issue(product: 'Desktop app', customerId: $id);
+Itaja::licenses()->revoke(keyId: $keyId, product: 'Desktop app', reason: 'chargeback');
 ```
 
 Events: `LicenseIssued` · `LicenseActivated` · `LicenseDeactivated` · `LicenseRevoked` ·
@@ -249,7 +252,9 @@ Itaja::customers()->get('user_42');          // your own customer id works too
 Itaja::request('GET', '/me');                // any endpoint the helpers do not cover
 ```
 
-A product made in the dashboard is named by its Itaja id: `productId: 'prd_…'`.
+Products and packs are referenced by their name at runtime too: the package
+resolves `product: 'AI tokens'` to Itaja's product once, by comparing the
+normalised name with what your last `itaja:push` created.
 
 Verify a delivery yourself, without the route:
 

@@ -8,17 +8,20 @@
  * });
  * ```
  *
- * Products are named by **your** catalogue ids (`"tokens"`), never by Itaja's:
- * the SDK resolves them once against the products your last `push` created.
+ * Products and packs are referenced by their **name** (`"AI tokens"`), never by
+ * an id: the SDK resolves a name once against the products your last `push`
+ * created, comparing it trimmed, inner spaces collapsed and case-insensitively.
  */
 import type { ApiPath, RequestBody, RequestQuery, ResponseData } from "./api-types.js";
 import {
   type CatalogDocument,
   type CatalogItem,
-  type CreditsIdOf,
-  type LicenseIdOf,
+  type CreditsNameOf,
+  type GroupNameOf,
+  type LicenseNameOf,
   type PlanNameOf,
-  type ProductIdOf,
+  type ProductNameOf,
+  normalizeName,
   toCatalogDocument,
 } from "./catalog.js";
 import { ItajaConfigError, ItajaError, ItajaNotFoundError } from "./errors.js";
@@ -50,8 +53,12 @@ export interface ItajaOptions<C extends readonly CatalogItem[]> {
   transport?: Pick<TransportOptions, "http" | "sleep">;
 }
 
-/** A product named by your catalogue id, or — for products made in the dashboard — by its Itaja id. */
-export type ProductRef<K extends string> = { product: K } | { productId: string };
+/**
+ * A product, referenced by its name (`"AI tokens"`) — the name your catalogue
+ * declares, or the one a dashboard product was pushed with. There is no id
+ * alternative.
+ */
+export type ProductRef<K extends string> = { product: K };
 
 type Data<P extends ApiPath, M extends "get" | "post" | "put" | "patch" | "delete"> = ResponseData<P, M>;
 
@@ -95,20 +102,21 @@ export interface Itaja<C extends readonly CatalogItem[]> {
   };
 
   readonly credits: {
-    grant(input: CreditMoveInput<CreditsIdOf<C>> & { expiresAt?: string | null; lowBalanceThreshold?: number }, options?: WriteOptions): Promise<Data<"/products/{productId}/credits/grant", "post">>;
+    grant(input: CreditMoveInput<CreditsNameOf<C>> & { expiresAt?: string | null; lowBalanceThreshold?: number }, options?: WriteOptions): Promise<Data<"/products/{productId}/credits/grant", "post">>;
     /** Refuses, writing nothing, when the balance is short. */
-    consume(input: CreditMoveInput<CreditsIdOf<C>>, options?: WriteOptions): Promise<Data<"/products/{productId}/credits/consume", "post">>;
-    balance(input: CreditRef<CreditsIdOf<C>>): Promise<Data<"/products/{productId}/credits/{customerId}/balance", "get">>;
-    wallet(input: CreditRef<CreditsIdOf<C>> & { limit?: number }): Promise<Data<"/products/{productId}/credits/{customerId}", "get">>;
+    consume(input: CreditMoveInput<CreditsNameOf<C>>, options?: WriteOptions): Promise<Data<"/products/{productId}/credits/consume", "post">>;
+    balance(input: CreditRef<CreditsNameOf<C>>): Promise<Data<"/products/{productId}/credits/{customerId}/balance", "get">>;
+    wallet(input: CreditRef<CreditsNameOf<C>> & { limit?: number }): Promise<Data<"/products/{productId}/credits/{customerId}", "get">>;
     /** A 15-minute token the buyer's device spends with, without your key. */
-    walletToken(input: CreditRef<CreditsIdOf<C>>): Promise<Data<"/products/{productId}/credits/{customerId}/wallet-token", "post">>;
-    packs(ref: ProductRef<CreditsIdOf<C>>): Promise<Data<"/products/{productId}/credit-packs", "get">>;
+    walletToken(input: CreditRef<CreditsNameOf<C>>): Promise<Data<"/products/{productId}/credits/{customerId}/wallet-token", "post">>;
+    packs(ref: ProductRef<CreditsNameOf<C>>): Promise<Data<"/products/{productId}/credit-packs", "get">>;
     /**
      * Sells a declared pack: returns the checkout to send the buyer to.
      * `successUrl`, `failureUrl` and `cancelUrl` are optional, as on `checkout.create`.
      */
     buy(
-      input: ProductRef<CreditsIdOf<C>> & {
+      input: ProductRef<CreditsNameOf<C>> & {
+        /** The pack's name (`"100 tokens"`), compared normalised. */
         pack: string;
         customerId: string;
         homeUrl: string;
@@ -123,14 +131,14 @@ export interface Itaja<C extends readonly CatalogItem[]> {
   };
 
   readonly licenses: {
-    issue(input: ProductRef<LicenseIdOf<C>> & RequestBody<"/products/{productId}/licenses", "post">, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses", "post">>;
-    list(input: ProductRef<LicenseIdOf<C>> & RequestQuery<"/products/{productId}/licenses", "get">): Promise<Data<"/products/{productId}/licenses", "get">>;
-    get(input: ProductRef<LicenseIdOf<C>> & { keyId: string }): Promise<Data<"/products/{productId}/licenses/{keyId}", "get">>;
-    revoke(input: ProductRef<LicenseIdOf<C>> & { keyId: string; reason?: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/revoke", "post">>;
-    suspend(input: ProductRef<LicenseIdOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/suspend", "post">>;
-    resume(input: ProductRef<LicenseIdOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/resume", "post">>;
-    rotate(input: ProductRef<LicenseIdOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/rotate", "post">>;
-    resend(input: ProductRef<LicenseIdOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/resend", "post">>;
+    issue(input: ProductRef<LicenseNameOf<C>> & RequestBody<"/products/{productId}/licenses", "post">, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses", "post">>;
+    list(input: ProductRef<LicenseNameOf<C>> & RequestQuery<"/products/{productId}/licenses", "get">): Promise<Data<"/products/{productId}/licenses", "get">>;
+    get(input: ProductRef<LicenseNameOf<C>> & { keyId: string }): Promise<Data<"/products/{productId}/licenses/{keyId}", "get">>;
+    revoke(input: ProductRef<LicenseNameOf<C>> & { keyId: string; reason?: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/revoke", "post">>;
+    suspend(input: ProductRef<LicenseNameOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/suspend", "post">>;
+    resume(input: ProductRef<LicenseNameOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/resume", "post">>;
+    rotate(input: ProductRef<LicenseNameOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/rotate", "post">>;
+    resend(input: ProductRef<LicenseNameOf<C>> & { keyId: string }, options?: WriteOptions): Promise<Data<"/products/{productId}/licenses/{keyId}/resend", "post">>;
   };
 
   readonly subscriptions: {
@@ -143,9 +151,17 @@ export interface Itaja<C extends readonly CatalogItem[]> {
 
   /**
    * One call for new, upgrade, downgrade, cancel-to-free and resume (ADR 0015 D4).
+   * `plan` is the plan's name; `product` (a subscription product's name) picks
+   * between products that sell a plan of the same name.
    * **Not served by the API yet** (itaja/itaja-services#465): throws `NOT_YET_AVAILABLE`.
    */
-  subscribe(input: { customerId: string; plan: PlanNameOf<C>; successUrl?: string; cancelUrl?: string }): Promise<never>;
+  subscribe(input: {
+    customerId: string;
+    plan: PlanNameOf<C>;
+    product?: GroupNameOf<C>;
+    successUrl?: string;
+    cancelUrl?: string;
+  }): Promise<never>;
   /** Is this customer entitled to a feature? **Not served yet** (#466). */
   check(input: { customerId: string; feature: string }): Promise<never>;
   /** Count usage against a metered feature. **Not served yet** (#466). */
@@ -183,24 +199,35 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
     }));
   const mode: KeyMode = apiKey.startsWith("itjs_") ? "sandbox" : "live";
 
-  // Your catalogue ids → Itaja product ids, read from the products a push created.
+  // Product names (normalised) → Itaja product ids, read from the products a
+  // push created: the API stores each product's normalised name as `catalogKey`.
   let productIds: Map<string, string> | null = null;
   const loadProducts = async () => {
     const products = await http().request<Array<{ id: string; catalogKey?: string | null }>>({
       method: "GET",
       path: "/products",
     });
-    productIds = new Map(products.filter((p) => p.catalogKey).map((p) => [p.catalogKey as string, p.id]));
+    productIds = new Map(
+      products.flatMap((p) => (p.catalogKey ? [[normalizeName(p.catalogKey), p.id] as const] : [])),
+    );
     return productIds;
   };
   const productId = async (ref: ProductRef<string>): Promise<string> => {
-    if ("productId" in ref) return ref.productId;
-    const known = (productIds ?? (await loadProducts())).get(ref.product);
+    const name = ref.product;
+    if (typeof name !== "string" || name.trim() === "") {
+      throw new ItajaConfigError({
+        message: "A product is referenced by its name: pass { product: \"AI tokens\" }.",
+        code: "PRODUCT_NAME_MISSING",
+        status: 0,
+      });
+    }
+    const key = normalizeName(name);
+    const known = (productIds ?? (await loadProducts())).get(key);
     if (known) return known;
-    const fresh = (await loadProducts()).get(ref.product);
+    const fresh = (await loadProducts()).get(key);
     if (fresh) return fresh;
     throw new ItajaNotFoundError({
-      message: `Product "${ref.product}" is not in your ${mode} Itaja catalogue. Run \`itaja push\` with this key first.`,
+      message: `No product named "${name}" in your ${mode} Itaja catalogue. Run \`itaja push\` with this key first.`,
       code: "CATALOG_PRODUCT_NOT_PUSHED",
       status: 404,
     });
@@ -242,7 +269,7 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
 
   /** Credits take their own body `idempotencyKey`; the SDK sends the header's, so a retry is one movement. */
   const creditMove = async (kind: "grant" | "consume", input: CreditMoveInput<string> & Record<string, unknown>, opts?: WriteOptions) => {
-    const { product: _p, productId: _id, ...body } = input as Record<string, unknown>;
+    const { product: _p, ...body } = input;
     const key = opts?.idempotencyKey ?? crypto.randomUUID();
     return http().request<never>({
       method: "POST",
@@ -295,10 +322,11 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
       buy: async (input, opts) => {
         const pid = await productId(input);
         const packs = await read<{ packs: Array<{ id: string; catalogKey?: string | null }> }>(`/products/${seg(pid)}/credit-packs`);
-        const pack = packs.packs.find((p) => p.catalogKey === input.pack || p.id === input.pack);
+        const wanted = normalizeName(String(input.pack ?? ""));
+        const pack = wanted === "" ? undefined : packs.packs.find((p) => p.catalogKey != null && normalizeName(p.catalogKey) === wanted);
         if (!pack) {
           throw new ItajaNotFoundError({
-            message: `Credit pack "${input.pack}" is not on sale for this product.`,
+            message: `No credit pack named "${input.pack}" is on sale for "${input.product}".`,
             code: "CREDIT_PACK_NOT_FOUND",
             status: 404,
           });
@@ -311,7 +339,7 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
 
     licenses: {
       issue: async (input, opts) => {
-        const { product: _p, productId: _id, ...body } = input as Record<string, unknown>;
+        const { product: _p, ...body } = input;
         return write("POST", await licensePath(input), body, opts);
       },
       list: async (input) => {
@@ -342,5 +370,5 @@ export function createItaja<const C extends readonly CatalogItem[] = []>(options
   } as Itaja<C>;
 }
 
-/** The ids your catalogue declares, for your own signatures. */
-export type { PlanNameOf, CreditsIdOf, LicenseIdOf, ProductIdOf };
+/** The names your catalogue declares, for your own signatures. */
+export type { PlanNameOf, CreditsNameOf, LicenseNameOf, ProductNameOf, GroupNameOf };

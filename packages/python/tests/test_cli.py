@@ -31,12 +31,12 @@ CONFIG = """
 import os
 from itaja import create_itaja, feature, group, plan
 
-m = feature("messages", "metered")
+m = feature("Messages", "metered")
 itaja = create_itaja(
     api_key=os.environ.get("ITAJA_API_KEY"),
     webhook_secret=os.environ.get("ITAJA_WEBHOOK_SECRET"),
     base_url=os.environ.get("ITAJA_API_URL"),
-    catalog=[m, plan("Free", group("app", "App"), default=True, includes=[m(limit=1)])],
+    catalog=[m, plan("Free", group("App"), default=True, includes=[m(limit=1)])],
 )
 """
 

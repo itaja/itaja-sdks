@@ -5,16 +5,18 @@
  *
  * ── HOW IT CAN FAIL (written before the code) ───────────────────────────────
  *
- * K1. A product named by the merchant's catalogue id is sent to the API under
- *     that id instead of Itaja's product id, or the lookup is not refreshed
- *     after a `push` that created it.
+ * K1. A product named by its name is sent to the API under that name instead
+ *     of Itaja's product id, another spelling of the same name (case, spaces)
+ *     is not found, or the lookup is not refreshed after a `push` that
+ *     created it.
  * K2. A product that was never pushed gives a raw 404 instead of a message that
  *     says to run `itaja:push`.
  * K3. `push(dryRun: true)` writes; a real push does not send the catalogue the
  *     declaration produces; the facade and the container give different objects.
  * K4. A credit grant or consume sends a body `idempotencyKey` different from the
  *     header's: a retry would be two movements.
- * K5. `buy` sells a pack that is not on sale, or picks the wrong pack.
+ * K5. `buy` sells a pack that is not on sale, picks the wrong pack, or does
+ *     not find a pack named with another spelling of its name.
  * K6. `subscribe`, `check` and `report` pretend to work: they must say the API
  *     does not serve them yet, never return a fake answer.
  * K7. A customer id with a slash or a space breaks the URL.
@@ -37,6 +39,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Itaja\Laravel\Catalog\Feature;
 use Itaja\Laravel\Catalog\License;
+use Itaja\Laravel\Exceptions\ConfigException;
 use Itaja\Laravel\Exceptions\ItajaException;
 use Itaja\Laravel\Exceptions\NotFoundException;
 use Itaja\Laravel\Facades\Itaja as ItajaFacade;
@@ -90,15 +93,15 @@ final class ClientTest extends TestCase
         $this->assertSame(ItajaFacade::catalog(), $real->data());
     }
 
-    public function test_k1_a_catalogue_id_is_resolved_to_the_itaja_product_id_once(): void
+    public function test_k1_a_product_name_is_resolved_normalised_to_the_itaja_product_id_once(): void
     {
         Http::fake([
-            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'tokens'], ['id' => 'prd_88', 'catalogKey' => 'desktop']]),
+            '*/products' => $this->ok([['id' => 'prd_dash', 'catalogKey' => null], ['id' => 'prd_77', 'catalogKey' => 'ai tokens'], ['id' => 'prd_88', 'catalogKey' => 'desktop app']]),
             '*/products/prd_77/credits/*/balance' => $this->ok(['balance' => 42]),
         ]);
 
-        $this->assertSame(['balance' => 42], ItajaFacade::credits()->balance('cus_1', product: 'tokens'));
-        ItajaFacade::credits()->balance('cus_1', product: 'tokens');
+        $this->assertSame(['balance' => 42], ItajaFacade::credits()->balance('cus_1', product: 'AI tokens'));
+        ItajaFacade::credits()->balance('cus_1', product: '  ai   TOKENS ');
 
         $lookups = array_filter($this->sent(), fn (Request $r) => str_ends_with($r->url(), '/products'));
         $this->assertCount(1, $lookups);
@@ -106,7 +109,7 @@ final class ClientTest extends TestCase
 
     public function test_k1_after_a_push_the_product_ids_are_read_again_not_served_from_a_stale_map(): void
     {
-        // The push re-creates "tokens" under a new Itaja id (archived, then declared again).
+        // The push re-creates "AI tokens" under a new Itaja id (archived, then declared again).
         $currentId = 'prd_old';
         Http::fake(function (Request $request) use (&$currentId) {
             if (str_ends_with($request->url(), '/catalog')) {
@@ -115,29 +118,32 @@ final class ClientTest extends TestCase
                 return $this->ok(['summary' => ['created' => 1, 'changed' => 0, 'archived' => 1, 'unchanged' => 0], 'changes' => []]);
             }
             if (str_ends_with($request->url(), '/products')) {
-                return $this->ok([['id' => $currentId, 'catalogKey' => 'tokens']]);
+                return $this->ok([['id' => $currentId, 'catalogKey' => 'ai tokens']]);
             }
 
             return $this->ok(['balance' => 5]);
         });
 
-        ItajaFacade::credits()->balance('cus_1', product: 'tokens'); // caches tokens → prd_old
+        ItajaFacade::credits()->balance('cus_1', product: 'AI tokens'); // caches "ai tokens" → prd_old
         ItajaFacade::push();
-        ItajaFacade::credits()->balance('cus_1', product: 'tokens');
+        ItajaFacade::credits()->balance('cus_1', product: 'AI tokens');
 
         $balances = array_values(array_filter($this->sent(), fn (Request $r) => str_ends_with($r->url(), '/balance')));
         $this->assertStringContainsString('/products/prd_old/', $balances[0]->url());
         $this->assertStringContainsString('/products/prd_new/', $balances[1]->url());
     }
 
-    public function test_k1_a_dashboard_product_is_named_by_its_itaja_id_with_no_lookup(): void
+    public function test_k1_a_blank_product_name_is_refused_before_any_request(): void
     {
-        Http::fake(['*' => $this->ok(['balance' => 1])]);
+        Http::fake();
 
-        ItajaFacade::credits()->balance('cus_1', productId: 'prd_dash');
-
-        $this->assertCount(1, $this->sent());
-        $this->assertStringContainsString('/products/prd_dash/credits/cus_1/balance', $this->sent()[0]->url());
+        try {
+            ItajaFacade::credits()->balance('cus_1', product: '   ');
+            $this->fail('expected an exception');
+        } catch (ConfigException $e) {
+            $this->assertSame('PRODUCT_NAME_MISSING', $e->errorCode);
+        }
+        Http::assertNothingSent();
     }
 
     public function test_k2_a_product_never_pushed_says_to_push(): void
@@ -145,10 +151,11 @@ final class ClientTest extends TestCase
         Http::fake(['*' => $this->ok([])]);
 
         try {
-            ItajaFacade::licenses()->issue(product: 'desktop');
+            ItajaFacade::licenses()->issue(product: 'Desktop app');
             $this->fail('expected an exception');
         } catch (NotFoundException $e) {
             $this->assertSame('CATALOG_PRODUCT_NOT_PUSHED', $e->errorCode);
+            $this->assertStringContainsString('No product named "Desktop app"', $e->getMessage());
             $this->assertStringContainsString('itaja:push', $e->getMessage());
         }
     }
@@ -156,12 +163,12 @@ final class ClientTest extends TestCase
     public function test_k4_a_credit_movement_sends_the_same_idempotency_key_in_header_and_body(): void
     {
         Http::fake([
-            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'tokens']]),
+            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'ai tokens']]),
             '*/credits/*' => $this->ok(['balanceAfter' => 7], 201),
         ]);
 
-        ItajaFacade::credits()->consume('cus_1', 3, product: 'tokens');
-        ItajaFacade::credits()->grant('cus_1', 50, product: 'tokens', idempotencyKey: 'order-9');
+        ItajaFacade::credits()->consume('cus_1', 3, product: 'AI tokens');
+        ItajaFacade::credits()->grant('cus_1', 50, product: 'AI tokens', idempotencyKey: 'order-9');
 
         [, $consume, $grant] = $this->sent();
         $this->assertSame($consume->data()['idempotencyKey'], $consume->header('Idempotency-Key')[0]);
@@ -170,25 +177,32 @@ final class ClientTest extends TestCase
         $this->assertSame(['order-9'], $grant->header('Idempotency-Key'));
     }
 
-    public function test_k5_buy_picks_the_pack_by_its_catalogue_id_and_refuses_an_unknown_one(): void
+    public function test_k5_buy_picks_the_pack_by_its_normalised_name_and_refuses_an_unknown_one(): void
     {
         Http::fake([
-            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'tokens']]),
-            '*/credit-packs' => $this->ok(['packs' => [['id' => 'pck_a', 'catalogKey' => 'small'], ['id' => 'pck_b', 'catalogKey' => 'large']]]),
+            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'ai tokens']]),
+            '*/credit-packs' => $this->ok(['packs' => [['id' => 'pck_a', 'catalogKey' => '100 tokens'], ['id' => 'pck_b', 'catalogKey' => '500 tokens']]]),
             '*/credit-packs/pck_b/checkout' => $this->ok(['checkoutUrl' => 'https://pay.test/c/1'], 201),
         ]);
 
-        $out = ItajaFacade::credits()->buy('large', 'cus_1', 'https://shop.test/thanks', product: 'tokens');
+        $out = ItajaFacade::credits()->buy(' 500  TOKENS', 'cus_1', 'https://shop.test/thanks', product: 'AI tokens');
 
         $this->assertSame('https://pay.test/c/1', $out['checkoutUrl']);
-        $this->expectException(NotFoundException::class);
-        ItajaFacade::credits()->buy('huge', 'cus_1', 'https://shop.test/thanks', product: 'tokens');
+        try {
+            // A pack's Itaja id is not its name.
+            ItajaFacade::credits()->buy('pck_a', 'cus_1', 'https://shop.test/thanks', product: 'AI tokens');
+            $this->fail('expected an exception');
+        } catch (NotFoundException $e) {
+            $this->assertSame('CREDIT_PACK_NOT_FOUND', $e->errorCode);
+            $this->assertStringContainsString('No credit pack named "pck_a"', $e->getMessage());
+        }
     }
 
     private function fakePackCheckout(): void
     {
         Http::fake([
-            '*/credit-packs' => $this->ok(['packs' => [['id' => 'pck_a', 'catalogKey' => 'small']]]),
+            '*/products' => $this->ok([['id' => 'prd_77', 'catalogKey' => 'ai tokens']]),
+            '*/credit-packs' => $this->ok(['packs' => [['id' => 'pck_a', 'catalogKey' => '100 tokens']]]),
             '*/credit-packs/pck_a/checkout' => $this->ok(['checkoutUrl' => 'https://pay.test/c/2'], 201),
         ]);
     }
@@ -206,10 +220,10 @@ final class ClientTest extends TestCase
         $this->fakePackCheckout();
 
         ItajaFacade::credits()->buy(
-            pack: 'small',
+            pack: '100 tokens',
             customerId: 'cus_1',
             homeUrl: 'https://shop.test/back',
-            productId: 'prd_77',
+            product: 'AI tokens',
             successUrl: 'https://shop.test/paid?order=1042#top',
             failureUrl: 'https://shop.test/failed',
             cancelUrl: 'https://shop.test/cart',
@@ -228,7 +242,7 @@ final class ClientTest extends TestCase
     {
         $this->fakePackCheckout();
 
-        ItajaFacade::credits()->buy(pack: 'small', customerId: 'cus_1', homeUrl: 'https://shop.test/back', productId: 'prd_77', failureUrl: 'https://shop.test/failed');
+        ItajaFacade::credits()->buy(pack: '100 tokens', customerId: 'cus_1', homeUrl: 'https://shop.test/back', product: 'AI tokens', failureUrl: 'https://shop.test/failed');
 
         $this->assertSame([
             'customerId' => 'cus_1',
@@ -241,7 +255,7 @@ final class ClientTest extends TestCase
     {
         $this->fakePackCheckout();
 
-        ItajaFacade::credits()->buy('small', 'cus_1', 'https://shop.test/back', null, 'prd_77', 'order-1042', 'fr');
+        ItajaFacade::credits()->buy('100 tokens', 'cus_1', 'https://shop.test/back', 'AI tokens', 'order-1042', 'fr');
 
         $this->assertSame([
             'customerId' => 'cus_1',

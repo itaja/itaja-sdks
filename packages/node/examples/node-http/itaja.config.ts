@@ -5,10 +5,10 @@
 import { createItaja, creditPack, credits, feature, group, license, plan } from "../../src/index.js";
 
 // 1. Declare
-export const messages = feature({ id: "messages", type: "metered" });
-export const exportCsv = feature({ id: "export", type: "boolean" });
+export const messages = feature({ name: "Messages", type: "metered" });
+export const exportCsv = feature({ name: "Export", type: "boolean" });
 
-const app = group({ id: process.env.EXAMPLE_GROUP_ID ?? "app", name: "My App" });
+const app = group({ name: process.env.EXAMPLE_GROUP_NAME ?? "My App" });
 export const free = plan({ name: "Free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
 export const pro = plan({
   name: "Pro",
@@ -18,9 +18,9 @@ export const pro = plan({
   includes: [messages({ limit: 2000, reset: "month" }), exportCsv()],
 });
 
-const tokens = credits({ id: process.env.EXAMPLE_TOKENS_ID ?? "tokens", name: "AI tokens", coinName: "Tokens" });
-export const small = creditPack({ id: "small", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
-export const ebook = license({ id: process.env.EXAMPLE_EBOOK_ID ?? "ebook", name: "The guide", devices: null, price: { amount: 3000, currency: "XOF" } });
+const tokens = credits({ name: process.env.EXAMPLE_TOKENS_NAME ?? "AI tokens", coinName: "Tokens" });
+export const small = creditPack({ name: "100 tokens", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
+export const ebook = license({ name: process.env.EXAMPLE_EBOOK_NAME ?? "The guide", devices: null, price: { amount: 3000, currency: "XOF" } });
 
 // 4. React
 export const itaja = createItaja({

@@ -7,15 +7,15 @@ use Itaja\Laravel\Http\Transport;
 
 final class Licenses
 {
-    /** @param  Closure(?string, ?string): string  $resolve  catalogue id / Itaja id → Itaja product id */
+    /** @param  Closure(string): string  $resolve  product name → Itaja product id */
     public function __construct(private readonly Transport $http, private readonly Closure $resolve)
     {
     }
 
     /** @return array<string, mixed> */
-    public function issue(?string $product = null, ?string $productId = null, ?string $customerId = null, ?int $activationsMax = null, ?string $expiresAt = null, ?string $idempotencyKey = null): array
+    public function issue(string $product, ?string $customerId = null, ?int $activationsMax = null, ?string $expiresAt = null, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId), null, array_filter([
+        return $this->http->request('POST', $this->path($product), null, array_filter([
             'customerId' => $customerId,
             'activationsMax' => $activationsMax,
             'expiresAt' => $expiresAt,
@@ -23,50 +23,50 @@ final class Licenses
     }
 
     /** @return array<string, mixed> */
-    public function list(?string $product = null, ?string $productId = null, ?int $limit = null, ?string $cursor = null): array
+    public function list(string $product, ?int $limit = null, ?string $cursor = null): array
     {
-        return $this->http->request('GET', $this->path($product, $productId), ['limit' => $limit, 'cursor' => $cursor]);
+        return $this->http->request('GET', $this->path($product), ['limit' => $limit, 'cursor' => $cursor]);
     }
 
     /** @return array<string, mixed> */
-    public function get(string $keyId, ?string $product = null, ?string $productId = null): array
+    public function get(string $keyId, string $product): array
     {
-        return $this->http->request('GET', $this->path($product, $productId, $keyId));
+        return $this->http->request('GET', $this->path($product, $keyId));
     }
 
     /** @return array<string, mixed> */
-    public function revoke(string $keyId, ?string $product = null, ?string $productId = null, ?string $reason = null, ?string $idempotencyKey = null): array
+    public function revoke(string $keyId, string $product, ?string $reason = null, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId, $keyId, '/revoke'), null, ['reason' => $reason], $idempotencyKey);
+        return $this->http->request('POST', $this->path($product, $keyId, '/revoke'), null, ['reason' => $reason], $idempotencyKey);
     }
 
     /** @return array<string, mixed> */
-    public function suspend(string $keyId, ?string $product = null, ?string $productId = null, ?string $idempotencyKey = null): array
+    public function suspend(string $keyId, string $product, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId, $keyId, '/suspend'), null, null, $idempotencyKey);
+        return $this->http->request('POST', $this->path($product, $keyId, '/suspend'), null, null, $idempotencyKey);
     }
 
     /** @return array<string, mixed> */
-    public function resume(string $keyId, ?string $product = null, ?string $productId = null, ?string $idempotencyKey = null): array
+    public function resume(string $keyId, string $product, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId, $keyId, '/resume'), null, null, $idempotencyKey);
+        return $this->http->request('POST', $this->path($product, $keyId, '/resume'), null, null, $idempotencyKey);
     }
 
     /** @return array<string, mixed> */
-    public function rotate(string $keyId, ?string $product = null, ?string $productId = null, ?string $idempotencyKey = null): array
+    public function rotate(string $keyId, string $product, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId, $keyId, '/rotate'), null, null, $idempotencyKey);
+        return $this->http->request('POST', $this->path($product, $keyId, '/rotate'), null, null, $idempotencyKey);
     }
 
     /** @return array<string, mixed> */
-    public function resend(string $keyId, ?string $product = null, ?string $productId = null, ?string $idempotencyKey = null): array
+    public function resend(string $keyId, string $product, ?string $idempotencyKey = null): array
     {
-        return $this->http->request('POST', $this->path($product, $productId, $keyId, '/resend'), null, null, $idempotencyKey);
+        return $this->http->request('POST', $this->path($product, $keyId, '/resend'), null, null, $idempotencyKey);
     }
 
-    private function path(?string $product, ?string $productId, ?string $keyId = null, string $tail = ''): string
+    private function path(string $product, ?string $keyId = null, string $tail = ''): string
     {
-        $base = '/products/'.rawurlencode(($this->resolve)($product, $productId)).'/licenses';
+        $base = '/products/'.rawurlencode(($this->resolve)($product)).'/licenses';
 
         return $base.($keyId !== null ? '/'.rawurlencode($keyId) : '').$tail;
     }

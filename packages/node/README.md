@@ -46,11 +46,11 @@ A free plan and a paid plan, with a quota that depends on the plan.
 import { createItaja, feature, group, plan } from "@itaja/node";
 
 // What the customer can do
-const messages = feature({ id: "messages", type: "metered" });
-const exportCsv = feature({ id: "export", type: "boolean" });
+const messages = feature({ name: "Messages", type: "metered" });
+const exportCsv = feature({ name: "Export", type: "boolean" });
 
 // One customer holds one plan of a group
-const app = group({ id: "app", name: "My App" });
+const app = group({ name: "My App" });
 
 const free = plan({
   name: "Free",
@@ -78,14 +78,16 @@ export const itaja = createItaja({
 The three options are read from these environment variables when you leave them
 out, so `createItaja({ catalog })` works the same once they are set.
 
-Your ids (`"app"`, `"messages"`) are yours and are typed as literals. A plan has
-no id: its **name** (`"Pro"`) is its identity in its group, compared
-case-insensitively (`"Pro"` and `" pro "` are the same plan), and Itaja assigns
-its system id. Rename a plan and you declare a new one; the old one is archived.
-Products, credit packs and licences keep their `id`. Amounts
-are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API
-would refuse — an undeclared feature, two default plans, a paid plan without a
-price — fail as soon as the file loads.
+Everything is identified by its **name** — there is no id to choose. Names are
+compared trimmed, inner spaces collapsed and case-insensitively (`"Pro"` and
+`" pro "` are the same plan), and are typed as literals. Product names are
+unique across all your products, feature names across your features, plan names
+within their group, pack names within their credits product. Rename an item and
+you declare a new one; the old one is archived. Amounts are in **major units**
+(`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — a blank
+or over-long name (200 characters at most), two items of one name, an undeclared
+feature, two default plans, a paid plan without a price — fail as soon as the
+file loads.
 
 ### 2. Push it
 
@@ -183,8 +185,9 @@ await itaja.subscriptions.cancel(subscriptionId); // at period end
 
 Events: `invoice.paid` · `invoice.payment_failed` · `subscription.past_due` · `subscription.canceled`.
 
-> **Coming with the API:** `subscribe()` (new, upgrade, downgrade, cancel-to-free
-> in one call), `check()` and `report()` for entitlements are typed and throw
+> **Coming with the API:** `subscribe({ customerId, plan: "Pro", product?: "My App" })`
+> (new, upgrade, downgrade, cancel-to-free in one call; `product` picks between
+> products that sell a plan of that name), `check()` and `report()` for entitlements are typed and throw
 > `NOT_YET_AVAILABLE` until the API serves them
 > ([itaja-services #465, #466](https://github.com/itaja/itaja-services/issues/465)).
 
@@ -195,22 +198,22 @@ A currency your app spends as the customer uses it, sold in packs.
 ```ts
 import { creditPack, credits } from "@itaja/node";
 
-const tokens = credits({ id: "tokens", name: "AI tokens", coinName: "Tokens" });
+const tokens = credits({ name: "AI tokens", coinName: "Tokens" });
 
-const small = creditPack({ id: "small", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
-const large = creditPack({ id: "large", of: tokens, credits: 1000, price: { amount: 8000, currency: "XOF" } });
+const small = creditPack({ name: "100 tokens", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
+const large = creditPack({ name: "1000 tokens", of: tokens, credits: 1000, price: { amount: 8000, currency: "XOF" } });
 ```
 
 ```ts
 const { checkoutUrl } = await itaja.credits.buy({
-  product: "tokens",
-  pack: "small",
+  product: "AI tokens",
+  pack: "100 tokens", // the pack's name, as the buyer reads it
   customerId,
   homeUrl,
   successUrl: "https://shop.example/credits/thanks", // optional, as on checkout.create
 });
-await itaja.credits.consume({ product: "tokens", customerId, amount: 3 });
-await itaja.credits.balance({ product: "tokens", customerId });
+await itaja.credits.consume({ product: "AI tokens", customerId, amount: 3 });
+await itaja.credits.balance({ product: "AI tokens", customerId });
 ```
 
 Events: `credits.granted` · `credits.consumed` · `credits.expired` · `credits.low` · `credits.clawed_back`.
@@ -223,7 +226,6 @@ Software that unlocks on a number of devices.
 import { license } from "@itaja/node";
 
 const desktop = license({
-  id: "desktop",
   name: "Desktop app",
   devices: 3, // null = unlimited
   duration: "days-365", // "lifetime" · "days-N" · "from-first-activation-days-N"
@@ -232,8 +234,8 @@ const desktop = license({
 ```
 
 ```ts
-await itaja.licenses.issue({ product: "desktop", customerId });
-await itaja.licenses.revoke({ product: "desktop", keyId, reason: "chargeback" });
+await itaja.licenses.issue({ product: "Desktop app", customerId });
+await itaja.licenses.revoke({ product: "Desktop app", keyId, reason: "chargeback" });
 ```
 
 Events: `license.issued` · `activated` · `deactivated` · `revoked` · `expired` · `rotated` · `suspended` · `resumed` · `updated`.
@@ -269,8 +271,16 @@ await itaja.customers.get("user_42"); // your own customer id works too
 await itaja.request("GET", "/me");    // any endpoint the helpers do not cover
 ```
 
-A product made in the dashboard can be named by its Itaja id:
-`{ productId: "prd_…" }`.
+Products and packs are referenced by their name at runtime too: the SDK resolves
+`product: "AI tokens"` to Itaja's product once, by comparing the normalised name
+with what your last `push` created. `PlanNameOf`, `ProductNameOf`,
+`CreditsNameOf` and `LicenseNameOf` give you those names as types:
+
+```ts
+import type { CreditsNameOf } from "@itaja/node";
+const catalog = [messages, exportCsv, free, pro, small, large] as const;
+type CreditProduct = CreditsNameOf<typeof catalog>; // "AI tokens"
+```
 
 Verify a delivery yourself, without the handler:
 

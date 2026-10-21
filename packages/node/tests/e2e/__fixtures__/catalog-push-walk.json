@@ -11,7 +11,7 @@
       },
       {
         "kind": "pack",
-        "key": "small",
+        "key": "100 Tokens",
         "product": "tokens-<run>",
         "action": "created",
         "version": null
@@ -65,7 +65,7 @@
       },
       {
         "kind": "pack",
-        "key": "small",
+        "key": "100 Tokens",
         "product": "tokens-<run>",
         "action": "unchanged",
         "version": null

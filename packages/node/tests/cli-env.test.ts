@@ -54,8 +54,8 @@ beforeAll(async () => {
   writeFileSync(
     join(dir, "itaja.config.mjs"),
     `import { createItaja, feature, group, plan } from ${JSON.stringify(dist)};
-const m = feature({ id: "messages", type: "metered" });
-const app = group({ id: "app", name: "App" });
+const m = feature({ name: "Messages", type: "metered" });
+const app = group({ name: "App" });
 export default createItaja({
   apiKey: process.env.ITAJA_API_KEY,
   webhookSecret: process.env.ITAJA_WEBHOOK_SECRET,

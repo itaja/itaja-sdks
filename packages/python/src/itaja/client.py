@@ -9,9 +9,10 @@
         on={"checkout.paid": fulfil},
     )
 
-Products are named by **your** catalogue ids (``"tokens"``), never by Itaja's: the
-SDK resolves them once against the products your last ``push`` created. A product
-made in the dashboard is named by its Itaja id instead (``product_id="prd_..."``).
+Products and credit packs are referenced by their **name** (``product="AI tokens"``,
+``pack="100 tokens"``), never by an id: the SDK resolves a name once against the products
+your last ``push`` created, comparing it trimmed, inner whitespace collapsed and
+case-insensitively.
 """
 
 from __future__ import annotations
@@ -25,8 +26,8 @@ from urllib.parse import quote
 import httpx
 
 from ._transport import DEFAULT_BASE_URL, Method, Transport, mode_of_key
-from .catalog import CatalogItem, to_catalog_document
-from .errors import ItajaError, ItajaNotFoundError
+from .catalog import CatalogItem, normalize_name, to_catalog_document
+from .errors import ItajaConfigError, ItajaError, ItajaNotFoundError
 from .handler import DedupeStore, Handler, WebhookProcessor
 from .webhooks import DEFAULT_TOLERANCE, Event
 
@@ -77,17 +78,15 @@ class Checkout(_Resource):
 
 
 class Credits(_Resource):
-    def _path(self, product: str | None, product_id: str | None) -> str:
-        return f"/products/{_seg(self._itaja._product_id(product, product_id))}"
+    def _path(self, product: str) -> str:
+        return f"/products/{_seg(self._itaja._product_id(product))}"
 
-    def _move(
-        self, kind: str, product: str | None, product_id: str | None, body: dict[str, Any], key: str | None
-    ) -> Any:
+    def _move(self, kind: str, product: str, body: dict[str, Any], key: str | None) -> Any:
         # Credits take their own body `idempotencyKey`: the same as the header's, so a retry is one movement.
         key = key or str(uuid.uuid4())
         return self._req(
             "POST",
-            f"{self._path(product, product_id)}/credits/{kind}",
+            f"{self._path(product)}/credits/{kind}",
             body={**body, "idempotencyKey": key},
             idempotency_key=key,
         )
@@ -97,8 +96,7 @@ class Credits(_Resource):
         *,
         customer_id: str,
         amount: int,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         reason: str | None = None,
         expires_at: str | None = None,
         low_balance_threshold: int | None = None,
@@ -113,38 +111,33 @@ class Credits(_Resource):
                 "lowBalanceThreshold": low_balance_threshold,
             }
         )
-        return self._move("grant", product, product_id, body, idempotency_key)
+        return self._move("grant", product, body, idempotency_key)
 
     def consume(
         self,
         *,
         customer_id: str,
         amount: int,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         reason: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
         """Refuses, writing nothing, when the balance is short."""
         body = _clean({"customerId": customer_id, "amount": amount, "reason": reason})
-        return self._move("consume", product, product_id, body, idempotency_key)
+        return self._move("consume", product, body, idempotency_key)
 
-    def balance(self, *, customer_id: str, product: str | None = None, product_id: str | None = None) -> Any:
-        return self._req("GET", f"{self._path(product, product_id)}/credits/{_seg(customer_id)}/balance")
+    def balance(self, *, customer_id: str, product: str) -> Any:
+        return self._req("GET", f"{self._path(product)}/credits/{_seg(customer_id)}/balance")
 
-    def wallet(
-        self, *, customer_id: str, product: str | None = None, product_id: str | None = None, limit: int | None = None
-    ) -> Any:
-        return self._req(
-            "GET", f"{self._path(product, product_id)}/credits/{_seg(customer_id)}", query={"limit": limit}
-        )
+    def wallet(self, *, customer_id: str, product: str, limit: int | None = None) -> Any:
+        return self._req("GET", f"{self._path(product)}/credits/{_seg(customer_id)}", query={"limit": limit})
 
-    def wallet_token(self, *, customer_id: str, product: str | None = None, product_id: str | None = None) -> Any:
+    def wallet_token(self, *, customer_id: str, product: str) -> Any:
         """A 15-minute token the buyer's device spends with, without your key."""
-        return self._req("POST", f"{self._path(product, product_id)}/credits/{_seg(customer_id)}/wallet-token")
+        return self._req("POST", f"{self._path(product)}/credits/{_seg(customer_id)}/wallet-token")
 
-    def packs(self, *, product: str | None = None, product_id: str | None = None) -> Any:
-        return self._req("GET", f"{self._path(product, product_id)}/credit-packs")
+    def packs(self, *, product: str) -> Any:
+        return self._req("GET", f"{self._path(product)}/credit-packs")
 
     def buy(
         self,
@@ -152,8 +145,7 @@ class Credits(_Resource):
         pack: str,
         customer_id: str,
         home_url: str,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         success_url: str | None = None,
         failure_url: str | None = None,
         cancel_url: str | None = None,
@@ -161,17 +153,26 @@ class Credits(_Resource):
         language: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
-        """Sells a declared pack: returns the checkout to send the buyer to.
+        """Sells a declared pack, named as declared (``pack="100 tokens"``): returns the checkout to
+        send the buyer to.
 
         ``success_url``, ``failure_url`` and ``cancel_url`` are optional, as on ``checkout.create``.
         """
-        base = self._path(product, product_id)
+        base = self._path(product)
         listed = self._req("GET", f"{base}/credit-packs")
         packs = listed.get("packs", []) if isinstance(listed, dict) else []
-        found = next((p for p in packs if p.get("catalogKey") == pack or p.get("id") == pack), None)
+        wanted = normalize_name(pack) if isinstance(pack, str) else ""
+        found = next(
+            (
+                p
+                for p in packs
+                if wanted and isinstance(p.get("catalogKey"), str) and normalize_name(p["catalogKey"]) == wanted
+            ),
+            None,
+        )
         if found is None:
             raise ItajaNotFoundError(
-                f'Credit pack "{pack}" is not on sale for this product.', code="CREDIT_PACK_NOT_FOUND", status=404
+                f'No credit pack named "{pack}" is on sale for "{product}".', code="CREDIT_PACK_NOT_FOUND", status=404
             )
         body = _clean(
             {
@@ -190,94 +191,87 @@ class Credits(_Resource):
 
 
 class Licenses(_Resource):
-    def _path(self, product: str | None, product_id: str | None, key_id: str | None = None, tail: str = "") -> str:
-        base = f"/products/{_seg(self._itaja._product_id(product, product_id))}/licenses"
+    def _path(self, product: str, key_id: str | None = None, tail: str = "") -> str:
+        base = f"/products/{_seg(self._itaja._product_id(product))}/licenses"
         return base + (f"/{_seg(key_id)}" if key_id else "") + tail
 
     def issue(
         self,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         customer_id: str | None = None,
         activations_max: int | None = None,
         expires_at: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
         body = _clean({"customerId": customer_id, "activationsMax": activations_max, "expiresAt": expires_at})
-        return self._req("POST", self._path(product, product_id), body=body, idempotency_key=idempotency_key)
+        return self._req("POST", self._path(product), body=body, idempotency_key=idempotency_key)
 
     def list(
         self,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Any:
-        return self._req("GET", self._path(product, product_id), query={"limit": limit, "cursor": cursor})
+        return self._req("GET", self._path(product), query={"limit": limit, "cursor": cursor})
 
-    def get(self, key_id: str, *, product: str | None = None, product_id: str | None = None) -> Any:
-        return self._req("GET", self._path(product, product_id, key_id))
+    def get(self, key_id: str, *, product: str) -> Any:
+        return self._req("GET", self._path(product, key_id))
 
     def revoke(
         self,
         key_id: str,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         reason: str | None = None,
         idempotency_key: str | None = None,
     ) -> Any:
         return self._req(
             "POST",
-            self._path(product, product_id, key_id, "/revoke"),
+            self._path(product, key_id, "/revoke"),
             body={"reason": reason},
             idempotency_key=idempotency_key,
         )
 
-    def _action(self, key_id: str, action: str, product: str | None, product_id: str | None, key: str | None) -> Any:
-        return self._req("POST", self._path(product, product_id, key_id, f"/{action}"), idempotency_key=key)
+    def _action(self, key_id: str, action: str, product: str, key: str | None) -> Any:
+        return self._req("POST", self._path(product, key_id, f"/{action}"), idempotency_key=key)
 
     def suspend(
         self,
         key_id: str,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         idempotency_key: str | None = None,
     ) -> Any:
-        return self._action(key_id, "suspend", product, product_id, idempotency_key)
+        return self._action(key_id, "suspend", product, idempotency_key)
 
     def resume(
         self,
         key_id: str,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         idempotency_key: str | None = None,
     ) -> Any:
-        return self._action(key_id, "resume", product, product_id, idempotency_key)
+        return self._action(key_id, "resume", product, idempotency_key)
 
     def rotate(
         self,
         key_id: str,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         idempotency_key: str | None = None,
     ) -> Any:
-        return self._action(key_id, "rotate", product, product_id, idempotency_key)
+        return self._action(key_id, "rotate", product, idempotency_key)
 
     def resend(
         self,
         key_id: str,
         *,
-        product: str | None = None,
-        product_id: str | None = None,
+        product: str,
         idempotency_key: str | None = None,
     ) -> Any:
-        return self._action(key_id, "resend", product, product_id, idempotency_key)
+        return self._action(key_id, "resend", product, idempotency_key)
 
 
 class Subscriptions(_Resource):
@@ -396,10 +390,17 @@ class Itaja:
         return self._transport.request(method, path, query=query, body=body, idempotency_key=idempotency_key)
 
     def subscribe(
-        self, *, customer_id: str, plan: str, success_url: str | None = None, cancel_url: str | None = None
+        self,
+        *,
+        customer_id: str,
+        plan: str,
+        product: str | None = None,
+        success_url: str | None = None,
+        cancel_url: str | None = None,
     ) -> Any:
         """One call for new, upgrade, downgrade, cancel-to-free. ``plan`` is the plan's name as declared in
-        the catalogue (``"Pro"``, case-insensitive). Not served by the API yet (itaja-services#465)."""
+        the catalogue (``"Pro"``, case-insensitive); ``product`` (a subscription product's name) picks
+        between products that sell a plan of that name. Not served by the API yet (itaja-services#465)."""
         raise self._not_yet("subscribe()", 465)
 
     def check(self, *, customer_id: str, feature: str) -> Any:
@@ -410,20 +411,20 @@ class Itaja:
         """Count usage against a metered feature. Not served yet (#466)."""
         raise self._not_yet("report()", 466)
 
-    def _product_id(self, product: str | None, product_id: str | None) -> str:
-        if product_id is not None:
-            return product_id
-        if product is None:
-            raise ItajaError(
-                "Name the product: product='your-catalogue-id' or product_id='prd_...'.", code="PRODUCT_MISSING"
+    def _product_id(self, product: str) -> str:
+        """A product's name → its Itaja id, via the ``catalogKey`` (the normalised name) the push stored."""
+        if not isinstance(product, str) or not product.strip():
+            raise ItajaConfigError(
+                'A product is referenced by its name: product="AI tokens".', code="PRODUCT_NAME_MISSING"
             )
-        known = (self._product_ids if self._product_ids is not None else self._load_products()).get(product)
+        key = normalize_name(product)
+        known = (self._product_ids if self._product_ids is not None else self._load_products()).get(key)
         if known is None:
-            known = self._load_products().get(product)
+            known = self._load_products().get(key)
         if known is not None:
             return known
         raise ItajaNotFoundError(
-            f'Product "{product}" is not in your {self.mode} Itaja catalogue. Run `itaja push` with this key first.',
+            f'No product named "{product}" in your {self.mode} Itaja catalogue. Run `itaja push` with this key first.',
             code="CATALOG_PRODUCT_NOT_PUSHED",
             status=404,
         )
@@ -431,9 +432,9 @@ class Itaja:
     def _load_products(self) -> dict[str, str]:
         products = self.request("GET", "/products")
         self._product_ids = {
-            p["catalogKey"]: p["id"]
+            normalize_name(p["catalogKey"]): p["id"]
             for p in (products if isinstance(products, list) else [])
-            if isinstance(p, dict) and p.get("catalogKey") and isinstance(p.get("id"), str)
+            if isinstance(p, dict) and isinstance(p.get("catalogKey"), str) and isinstance(p.get("id"), str)
         }
         return self._product_ids
 

@@ -15,7 +15,7 @@ final class Plan
 {
     public const INTERVALS = ['week', 'month', 'quarter', 'year'];
 
-    public const NAME_MAX_LENGTH = 200;
+    public const NAME_MAX_LENGTH = Support::NAME_MAX_LENGTH;
 
     /**
      * @param  array{amount: int|float, currency: string, interval: string, intervalCount?: int}|null  $price
@@ -34,6 +34,7 @@ final class Plan
 
     /**
      * @param  string  $name  The plan's name: shown to customers, and its identity in the group.
+     * @param  Group|string  $group  The group, or its name.
      * @param  array{amount: int|float, currency: string, interval: string, intervalCount?: int}|null  $price
      * @param  list<array{feature: string, limit?: int, reset?: string}>  $includes
      */
@@ -46,14 +47,8 @@ final class Plan
         bool $default = false,
         array $includes = [],
     ): self {
-        $name = trim($name);
-        if ($name === '') {
-            throw Support::error('A plan needs a non-blank name: the name is the plan\'s identity in its group.');
-        }
-        if (mb_strlen($name) > self::NAME_MAX_LENGTH) {
-            throw Support::error('Plan name "'.mb_substr($name, 0, 40).'…" is too long: at most '.self::NAME_MAX_LENGTH.' characters.');
-        }
-        $group = $group instanceof Group ? $group : new Group($group, Support::humanize($group));
+        Support::assertName($name, 'plan', "Plan::make('Pro', \$app, ...)");
+        $group = $group instanceof Group ? $group : new Group($group);
         if (! $default && $price === null) {
             throw Support::error("Plan \"{$name}\" has no price: only the group's default plan may be free.");
         }
@@ -75,6 +70,6 @@ final class Plan
 
     public static function normalize(string $name): string
     {
-        return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim($name)));
+        return Support::normalize($name);
     }
 }

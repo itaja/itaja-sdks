@@ -17,8 +17,10 @@ E1. ``api_key`` / ``webhook_secret`` / ``base_url`` passed to ``create_itaja`` a
 E2. Without arguments, ``ITAJA_API_KEY`` / ``ITAJA_WEBHOOK_SECRET`` /
     ``ITAJA_API_URL`` are not read.
 E3. A missing key or secret fails silently instead of naming the variable.
-K1. A catalogue id is sent instead of Itaja's product id, or the map is stale after a
-    push that re-created the product.
+K1. A product name is sent instead of Itaja's product id, a spelling that differs only by
+    case or spacing misses the product (the API's ``catalogKey`` is the normalised name),
+    the map is stale after a push that re-created the product, or an id is accepted in
+    place of a name.
 K2. A credit movement sends a body ``idempotencyKey`` different from the header's.
 K3. ``subscribe`` / ``check`` / ``report`` pretend to work.
 K4. An id with a slash or a space breaks the URL.
@@ -238,7 +240,7 @@ def test_e3_a_missing_key_or_secret_names_the_variable() -> None:
 # ── the client ──────────────────────────────────────────────────────────────
 
 
-def test_k1_a_catalogue_id_resolves_once_and_again_after_a_push() -> None:
+def test_k1_a_product_name_resolves_once_and_again_after_a_push() -> None:
     current = {"id": "prd_old"}
 
     def api(request: httpx.Request) -> httpx.Response:
@@ -246,15 +248,15 @@ def test_k1_a_catalogue_id_resolves_once_and_again_after_a_push() -> None:
             current["id"] = "prd_new"
             return ok({"summary": {"created": 1}, "changes": []})
         if request.url.path.endswith("/products"):
-            return ok([{"id": current["id"], "catalogKey": "tokens"}])
+            return ok([{"id": current["id"], "catalogKey": "ai tokens"}])
         return ok({"balance": 5})
 
     r = Recorder(api)
     itaja = r.client()
-    itaja.credits.balance(customer_id="cus_1", product="tokens")
-    itaja.credits.balance(customer_id="cus_1", product="tokens")
+    itaja.credits.balance(customer_id="cus_1", product="AI tokens")
+    itaja.credits.balance(customer_id="cus_1", product="  ai   TOKENS ")
     itaja.push()
-    itaja.credits.balance(customer_id="cus_1", product="tokens")
+    itaja.credits.balance(customer_id="cus_1", product="AI tokens")
     balances = [req.url.path for req in r.requests if req.url.path.endswith("/balance")]
     lookups = [req for req in r.requests if req.url.path.endswith("/products")]
     assert balances == [
@@ -265,62 +267,86 @@ def test_k1_a_catalogue_id_resolves_once_and_again_after_a_push() -> None:
     assert len(lookups) == 2
 
 
-def test_k1_a_product_never_pushed_says_to_push_and_a_dashboard_id_needs_no_lookup() -> None:
+def test_k1_a_product_never_pushed_says_to_push() -> None:
     r = Recorder(lambda request: ok([]) if request.url.path.endswith("/products") else ok({"balance": 1}))
-    with pytest.raises(ItajaNotFoundError, match="itaja push") as caught:
-        r.client().licenses.issue(product="desktop")
+    with pytest.raises(ItajaNotFoundError, match=r'No product named "Desktop app".*itaja push') as caught:
+        r.client().licenses.issue(product="Desktop app")
     assert caught.value.code == "CATALOG_PRODUCT_NOT_PUSHED"
-    r.requests.clear()
-    r.client().credits.balance(customer_id="cus_1", product_id="prd_dash")
-    assert [req.url.path for req in r.requests] == ["/api/v1/products/prd_dash/credits/cus_1/balance"]
+
+
+def test_k1_a_product_is_referenced_by_name_only() -> None:
+    r = Recorder(lambda _: ok({"balance": 1}))
+    with pytest.raises(TypeError):
+        r.client().credits.balance(customer_id="cus_1", product_id="prd_dash")  # type: ignore[call-arg]
+    with pytest.raises(ItajaConfigError, match="by its name") as caught:
+        r.client().credits.balance(customer_id="cus_1", product="  ")
+    assert caught.value.code == "PRODUCT_NAME_MISSING"
+    assert r.requests == []
+
+
+def test_k1_a_licence_is_issued_against_its_product_name() -> None:
+    def api(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/products"):
+            return ok([{"id": "prd_lic", "catalogKey": "desktop app"}, {"id": "prd_x", "catalogKey": None}])
+        return ok({"keyId": "key_1"}, 201)
+
+    r = Recorder(api)
+    r.client().licenses.issue(product="Desktop App", customer_id="cus_1")
+    assert r.requests[-1].url.path == "/api/v1/products/prd_lic/licenses"
+    assert json.loads(r.requests[-1].content) == {"customerId": "cus_1"}
 
 
 def test_k2_a_credit_movement_sends_the_same_key_in_header_and_body() -> None:
     r = Recorder(
         lambda request: (
-            ok([{"id": "prd_77", "catalogKey": "tokens"}]) if request.url.path.endswith("/products") else ok({}, 201)
+            ok([{"id": "prd_77", "catalogKey": "ai tokens"}]) if request.url.path.endswith("/products") else ok({}, 201)
         )
     )
     itaja = r.client()
-    itaja.credits.consume(customer_id="cus_1", amount=3, product="tokens")
-    itaja.credits.grant(customer_id="cus_1", amount=50, product="tokens", idempotency_key="order-9")
+    itaja.credits.consume(customer_id="cus_1", amount=3, product="AI tokens")
+    itaja.credits.grant(customer_id="cus_1", amount=50, product="AI tokens", idempotency_key="order-9")
     consume, grant = (req for req in r.requests if "/credits/" in req.url.path)
     consume_body, grant_body = json.loads(consume.content), json.loads(grant.content)
     assert consume_body["idempotencyKey"] == consume.headers["idempotency-key"] and consume_body["amount"] == 3
     assert grant_body["idempotencyKey"] == grant.headers["idempotency-key"] == "order-9"
 
 
-def test_k2_buy_picks_the_pack_by_its_catalogue_id_and_refuses_an_unknown_one() -> None:
+def test_k2_buy_picks_the_pack_by_its_normalised_name_and_refuses_an_unknown_one() -> None:
     def api(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/products"):
-            return ok([{"id": "prd_77", "catalogKey": "tokens"}])
+            return ok([{"id": "prd_77", "catalogKey": "ai tokens"}])
         if request.url.path.endswith("/credit-packs"):
-            return ok({"packs": [{"id": "pck_a", "catalogKey": "small"}, {"id": "pck_b", "catalogKey": "large"}]})
+            return ok(
+                {"packs": [{"id": "pck_a", "catalogKey": "100 tokens"}, {"id": "pck_b", "catalogKey": "500 tokens"}]}
+            )
         return ok({"checkoutUrl": "https://pay.test/c/1"}, 201)
 
     r = Recorder(api)
     out = r.client().credits.buy(
-        pack="large", customer_id="cus_1", home_url="https://shop.test/thanks", product="tokens"
+        pack=" 500  TOKENS", customer_id="cus_1", home_url="https://shop.test/thanks", product="AI tokens"
     )
     assert out["checkoutUrl"] == "https://pay.test/c/1"
     assert r.requests[-1].url.path == "/api/v1/products/prd_77/credit-packs/pck_b/checkout"
-    with pytest.raises(ItajaNotFoundError):
-        r.client().credits.buy(pack="huge", customer_id="cus_1", home_url="https://shop.test", product="tokens")
+    with pytest.raises(ItajaNotFoundError, match='No credit pack named "pck_b"') as caught:
+        r.client().credits.buy(pack="pck_b", customer_id="cus_1", home_url="https://shop.test", product="AI tokens")
+    assert caught.value.code == "CREDIT_PACK_NOT_FOUND"
 
 
 def _packs_api(request: httpx.Request) -> httpx.Response:
+    if request.url.path.endswith("/products"):
+        return ok([{"id": "prd_77", "catalogKey": "ai tokens"}])
     if request.url.path.endswith("/credit-packs"):
-        return ok({"packs": [{"id": "pck_a", "catalogKey": "small"}]})
+        return ok({"packs": [{"id": "pck_a", "catalogKey": "100 tokens"}]})
     return ok({"checkoutUrl": "https://pay.test/c/2"}, 201)
 
 
 def test_r1_r2_buy_sends_each_return_url_under_its_api_name() -> None:
     r = Recorder(_packs_api)
     r.client().credits.buy(
-        pack="small",
+        pack="100 tokens",
         customer_id="cus_1",
         home_url="https://shop.test/back",
-        product_id="prd_77",
+        product="AI tokens",
         success_url="https://shop.test/paid?order=1042#top",
         failure_url="https://shop.test/failed",
         cancel_url="https://shop.test/cart",
@@ -338,10 +364,10 @@ def test_r1_r2_buy_sends_each_return_url_under_its_api_name() -> None:
 def test_r2_an_omitted_return_url_is_absent_never_null() -> None:
     r = Recorder(_packs_api)
     r.client().credits.buy(
-        pack="small",
+        pack="100 tokens",
         customer_id="cus_1",
         home_url="https://shop.test/back",
-        product_id="prd_77",
+        product="AI tokens",
         cancel_url="https://shop.test/cart",
     )
     assert json.loads(r.requests[-1].content) == {
@@ -372,7 +398,7 @@ def test_k3_the_calls_the_api_does_not_serve_yet_say_so() -> None:
     r = Recorder([])
     itaja = r.client()
     for call in (
-        lambda: itaja.subscribe(customer_id="cus_1", plan="Pro"),
+        lambda: itaja.subscribe(customer_id="cus_1", plan="Pro", product="My App"),
         lambda: itaja.check(customer_id="cus_1", feature="export"),
         lambda: itaja.report(customer_id="cus_1", feature="messages"),
     ):
@@ -391,9 +417,9 @@ def test_k4_an_id_with_a_slash_or_a_space_is_encoded() -> None:
 def test_push_dry_run_sends_the_flag_and_the_declared_catalogue() -> None:
     from itaja import feature, group, plan
 
-    messages = feature("messages", "metered")
+    messages = feature("Messages", "metered")
     r = Recorder(lambda _: ok({"summary": {}, "changes": []}))
-    itaja = r.client(catalog=[messages, plan("Free", group("app", "App"), default=True, includes=[messages(limit=1)])])
+    itaja = r.client(catalog=[messages, plan("Free", group("App"), default=True, includes=[messages(limit=1)])])
     itaja.push(dry_run=True)
     itaja.push()
     dry, real = r.requests

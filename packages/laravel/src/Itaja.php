@@ -7,6 +7,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Str;
 use Itaja\Laravel\Catalog\Catalog;
+use Itaja\Laravel\Catalog\Support;
 use Itaja\Laravel\Exceptions\ConfigException;
 use Itaja\Laravel\Exceptions\ItajaException;
 use Itaja\Laravel\Exceptions\NotFoundException;
@@ -17,16 +18,16 @@ use Itaja\Laravel\Http\Transport;
  * `Itaja` facade:
  *
  *     Itaja::push();
- *     Itaja::credits()->consume(product: 'tokens', customerId: $id, amount: 3);
+ *     Itaja::credits()->consume(product: 'AI tokens', customerId: $id, amount: 3);
  *
- * Products are named by YOUR catalogue ids ('tokens'), never by Itaja's: the
- * SDK resolves them once against the products your last `itaja:push` created.
- * A product made in the dashboard is named by its Itaja id instead
- * (`productId: 'prd_…'`).
+ * Products and packs are referenced by their NAME ('AI tokens'), never by an
+ * id: the SDK resolves a name once against the products your last
+ * `itaja:push` created, comparing it trimmed, inner spaces collapsed and
+ * case-insensitively.
  */
 final class Itaja
 {
-    /** @var array<string, string>|null catalogue id → Itaja product id */
+    /** @var array<string, string>|null normalised product name → Itaja product id */
     private ?array $productIds = null;
 
     /** @var Closure(): iterable<mixed> */
@@ -130,10 +131,11 @@ final class Itaja
     /**
      * One call for new, upgrade, downgrade, cancel-to-free and resume.
      * `$plan` is the plan's NAME as declared (`Plan::make('Pro', ...)`),
-     * matched case-insensitively within its product; Itaja owns the plan's id.
+     * matched case-insensitively; `$product` (a subscription product's name)
+     * picks between products that sell a plan of that name.
      * Not served by the API yet (itaja/itaja-services#465).
      */
-    public function subscribe(string $customerId, string $plan, ?string $successUrl = null, ?string $cancelUrl = null): never
+    public function subscribe(string $customerId, string $plan, ?string $product = null, ?string $successUrl = null, ?string $cancelUrl = null): never
     {
         throw $this->notYet('subscribe()', 465);
     }
@@ -187,22 +189,20 @@ final class Itaja
         );
     }
 
-    /** @return Closure(?string, ?string): string */
+    /** @return Closure(string): string */
     private function resolver(): Closure
     {
-        return function (?string $product, ?string $productId): string {
-            if ($productId !== null) {
-                return $productId;
+        return function (string $product): string {
+            $key = Support::normalize($product);
+            if ($key === '') {
+                throw new ConfigException('A product is referenced by its name: product: \'AI tokens\'.', 'PRODUCT_NAME_MISSING', 0);
             }
-            if ($product === null) {
-                throw new ConfigException('Name the product: product: \'your-catalogue-id\' or productId: \'prd_…\'.', 'PRODUCT_MISSING', 0);
-            }
-            $known = ($this->productIds ?? $this->loadProducts())[$product] ?? ($this->loadProducts())[$product] ?? null;
+            $known = ($this->productIds ?? $this->loadProducts())[$key] ?? ($this->loadProducts())[$key] ?? null;
             if ($known !== null) {
                 return $known;
             }
             throw new NotFoundException(
-                "Product \"{$product}\" is not in your {$this->mode()} Itaja catalogue. Run `php artisan itaja:push` with this key first.",
+                "No product named \"{$product}\" in your {$this->mode()} Itaja catalogue. Run `php artisan itaja:push` with this key first.",
                 'CATALOG_PRODUCT_NOT_PUSHED',
                 404,
             );
@@ -216,7 +216,7 @@ final class Itaja
         $map = [];
         foreach (is_array($products) ? $products : [] as $product) {
             if (is_array($product) && ! empty($product['catalogKey']) && is_string($product['id'] ?? null)) {
-                $map[(string) $product['catalogKey']] = $product['id'];
+                $map[Support::normalize((string) $product['catalogKey'])] = $product['id'];
             }
         }
 
