@@ -262,6 +262,12 @@ Itaja's return page. Itaja adds `itaja_checkout_id` and `itaja_status`
 (`success | failure | cancel`) to the address. The redirect is payer-visible:
 confirm payment from the webhook, never from it.
 
+Your brand colours are set in the dashboard, not in code: **Settings → Brand & checkout →
+Brand colours** (a primary colour for the summary panel, an accent colour for the pay button).
+They apply to every payment page of your account: the checkouts your code creates
+(`itaja.checkout.create`, `itaja.credits.buy`) and the share links of your products and offers (one-off, subscription,
+credits, licence). No SDK option sets them.
+
 Payment links are a dashboard feature: no builder or endpoint here creates one.
 
 ## Also in the SDK
