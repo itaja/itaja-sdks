@@ -53,14 +53,14 @@ const exportCsv = feature({ id: "export", type: "boolean" });
 const app = group({ id: "app", name: "My App" });
 
 const free = plan({
-  id: "free",
+  name: "Free",
   group: app,
   default: true, // everyone starts here, no payment
   includes: [messages({ limit: 100, reset: "month" })],
 });
 
 const pro = plan({
-  id: "pro",
+  name: "Pro",
   group: app,
   price: { amount: 5000, currency: "XOF", interval: "month" },
   trial: { days: 7 },
@@ -78,7 +78,11 @@ export const itaja = createItaja({
 The three options are read from these environment variables when you leave them
 out, so `createItaja({ catalog })` works the same once they are set.
 
-Your ids (`"pro"`, `"messages"`) are yours and are typed as literals. Amounts
+Your ids (`"app"`, `"messages"`) are yours and are typed as literals. A plan has
+no id: its **name** (`"Pro"`) is its identity in its group, compared
+case-insensitively (`"Pro"` and `" pro "` are the same plan), and Itaja assigns
+its system id. Rename a plan and you declare a new one; the old one is archived.
+Products, credit packs and licences keep their `id`. Amounts
 are in **major units** (`5000` XOF, `9.99` EUR), as in the API. Mistakes the API
 would refuse — an undeclared feature, two default plans, a paid plan without a
 price — fail as soon as the file loads.
@@ -161,7 +165,7 @@ The example above is the whole declaration. Around it:
 
 ```ts
 const team = plan({
-  id: "team",
+  name: "Team",
   group: app,
   price: { amount: 15000, currency: "XOF", interval: "month" },
   includes: [messages({ limit: 20000, reset: "month" }), exportCsv()],

@@ -2,7 +2,8 @@
 that turns what you declared into the canonical JSON ``PUT /v1/catalog`` takes
 (``spec/catalog.schema.json``).
 
-Every id is **yours** (``"free"``, ``"pro"``, ``"messages"``). Amounts are in
+Every id is **yours** (``"app"``, ``"messages"``, ``"small"``). Plans have no id: a plan is
+identified by its **name** inside its product (``"Pro"``), compared case-insensitively. Amounts are in
 **major units** of their currency, as on every product route of the API
 (``5000`` XOF, ``9.99`` EUR).
 """
@@ -133,9 +134,11 @@ def group(id: str, name: str, description: str | None = None) -> Group:
 
 @dataclass(frozen=True)
 class Plan:
-    id: str
-    group: Group
+    """A plan of a subscription product. Its ``name`` is its identity inside the product: Itaja
+    assigns the system id, and renaming a plan creates a new one (the old one is archived)."""
+
     name: str
+    group: Group
     description: str | None = None
     price: Price | None = None
     trial_days: int | None = None
@@ -143,27 +146,39 @@ class Plan:
     includes: tuple[Inclusion, ...] = field(default_factory=tuple)
 
 
+_PLAN_NAME_MAX = 200
+
+
+def _plan_key(name: str) -> str:
+    """How Itaja compares plan names: trimmed, inner whitespace collapsed, case-insensitive."""
+    return " ".join(name.split()).casefold()
+
+
 def plan(
-    id: str,
+    name: str,
     group: Group | str,
     *,
-    name: str | None = None,
     description: str | None = None,
     price: Price | None = None,
     trial_days: int | None = None,
     default: bool = False,
     includes: Sequence[Inclusion] = (),
 ) -> Plan:
-    """A plan of a group. The group's ``default`` plan is its free fallback and may omit ``price``."""
-    _assert_id(id, "plan")
+    """A plan of a group, identified by its ``name`` (``"Pro"``). The group's ``default`` plan is
+    its free fallback and may omit ``price``."""
+    if not isinstance(name, str) or not name.strip():
+        raise _error("A plan needs a name: it is the plan's identity inside its product.")
+    name = name.strip()
+    if len(name) > _PLAN_NAME_MAX:
+        raise _error(f'Plan "{name[:40]}...": a plan name is at most {_PLAN_NAME_MAX} characters.')
     g = group if isinstance(group, Group) else Group(group, _humanize(group))
     if not default and price is None:
-        raise _error(f'Plan "{id}" has no price: only the group\'s default plan may be free.')
+        raise _error(f'Plan "{name}" has no price: only the group\'s default plan may be free.')
     if price is not None:
-        _assert_money(price, f'Plan "{id}"')
+        _assert_money(price, f'Plan "{name}"')
         if price.get("interval") not in INTERVALS:
-            raise _error(f'Plan "{id}": price.interval must be one of {", ".join(INTERVALS)}.')
-    return Plan(id, g, name or _humanize(id), description, price, trial_days, default, tuple(includes))
+            raise _error(f'Plan "{name}": price.interval must be one of {", ".join(INTERVALS)}.')
+    return Plan(name, g, description, price, trial_days, default, tuple(includes))
 
 
 # ── Credits ─────────────────────────────────────────────────────────────────
@@ -283,8 +298,12 @@ def to_catalog_document(items: Iterable[CatalogItem]) -> dict[str, Any]:
             elif groups[gid][0].name != item.group.name:
                 raise _error(f'Group "{gid}" is declared with two different names.')
             plans = groups[gid][1]
-            if any(p.id == item.id for p in plans):
-                raise _error(f'Plan "{item.id}" is declared twice in group "{gid}".')
+            same = next((p for p in plans if _plan_key(p.name) == _plan_key(item.name)), None)
+            if same is not None:
+                raise _error(
+                    f'Plan "{item.name}" is declared twice in group "{gid}" (as "{same.name}"): plan names '
+                    "are compared case-insensitively, ignoring extra whitespace."
+                )
             if item.default and any(p.default for p in plans):
                 raise _error(f'Group "{gid}" has two default plans; keep one.')
             plans.append(item)
@@ -316,7 +335,7 @@ def to_catalog_document(items: Iterable[CatalogItem]) -> dict[str, Any]:
                 for inclusion in p.includes:
                     if inclusion["feature"] not in features:
                         raise _error(
-                            f'Plan "{p.id}" includes feature "{inclusion["feature"]}", which the catalogue '
+                            f'Plan "{p.name}" includes feature "{inclusion["feature"]}", which the catalogue '
                             "does not declare. Add the feature to the catalogue."
                         )
             products.append(
@@ -329,7 +348,6 @@ def to_catalog_document(items: Iterable[CatalogItem]) -> dict[str, Any]:
                         "plans": [
                             _drop_none(
                                 {
-                                    "id": p.id,
                                     "name": p.name,
                                     "description": p.description,
                                     "price": dict(p.price) if p.price is not None else None,

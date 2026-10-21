@@ -19,7 +19,7 @@ export type {
   MeteredFeature,
   Money,
   Plan,
-  PlanIdOf,
+  PlanNameOf,
   ProductIdOf,
   Reset,
 } from "./catalog.js";

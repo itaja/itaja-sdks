@@ -13,6 +13,9 @@ C4. Two default plans in a group, a paid plan without a price, a boolean feature
     twice, an unknown interval or licence duration are accepted locally.
 C5. An invalid id passes locally and fails on the server.
 C6. The same declaration serialises differently twice, or leaks ``None`` values.
+C7. A plan is sent with an id, or without a name: the name is its identity inside its
+    product (trimmed, inner whitespace collapsed, case-insensitive). A blank or too-long
+    name, or two names that only differ by case or spacing in one group, pass locally.
 """
 
 from __future__ import annotations
@@ -42,9 +45,9 @@ def declare() -> list[Any]:
     messages = feature("messages", "metered")
     export = feature("export", "boolean")
     app = group("app", "My App")
-    free = plan("free", app, default=True, includes=[messages(limit=100, reset="month")])
+    free = plan("Free", app, default=True, includes=[messages(limit=100, reset="month")])
     pro = plan(
-        "pro",
+        "Pro",
         app,
         price={"amount": 5000, "currency": "XOF", "interval": "month"},
         trial_days=7,
@@ -69,7 +72,7 @@ def test_c2_it_is_the_document_the_typescript_sdk_builds() -> None:
 def test_c2_list_order_is_declaration_order() -> None:
     document = to_catalog_document(declare())
     assert [p["id"] for p in document["products"]] == ["app", "tokens", "desktop"]
-    assert [p["id"] for p in document["products"][0]["plans"]] == ["free", "pro"]
+    assert [p["name"] for p in document["products"][0]["plans"]] == ["Free", "Pro"]
 
 
 def test_c6_the_same_declaration_always_serialises_to_the_same_bytes() -> None:
@@ -86,16 +89,16 @@ def test_c6_unlimited_devices_is_sent_as_null() -> None:
 def test_c3_a_plan_including_an_undeclared_feature_is_refused_locally() -> None:
     messages = feature("messages", "metered")
     with pytest.raises(ItajaConfigError, match='includes feature "messages"'):
-        to_catalog_document([plan("free", "app", default=True, includes=[messages(limit=1)])])
+        to_catalog_document([plan("Free", "app", default=True, includes=[messages(limit=1)])])
 
 
 RULES: list[tuple[str, Callable[[], Any], str]] = [
     (
         "two default plans",
-        lambda: to_catalog_document([plan("a", "app", default=True), plan("b", "app", default=True)]),
+        lambda: to_catalog_document([plan("A", "app", default=True), plan("B", "app", default=True)]),
         "two default plans",
     ),
-    ("a paid plan without a price", lambda: plan("pro", "app"), "has no price"),
+    ("a paid plan without a price", lambda: plan("Pro", "app"), "has no price"),
     ("a boolean feature with a limit", lambda: feature("export", "boolean")(limit=3), "is boolean"),
     ("a metered feature without a limit", lambda: feature("messages", "metered")(), "is metered"),
     ("a negative quota", lambda: feature("messages", "metered")(limit=-1), "is metered"),
@@ -112,15 +115,15 @@ RULES: list[tuple[str, Callable[[], Any], str]] = [
         "a plan declared twice",
         lambda: to_catalog_document(
             [
-                plan("a", "app", default=True),
-                plan("a", "app", price={"amount": 1, "currency": "XOF", "interval": "month"}),
+                plan("A", "app", default=True),
+                plan("A", "app", price={"amount": 1, "currency": "XOF", "interval": "month"}),
             ]
         ),
         "declared twice",
     ),
     (
         "an unknown interval",
-        lambda: plan("p", "app", price={"amount": 1, "currency": "XOF", "interval": "decade"}),  # type: ignore[typeddict-item]
+        lambda: plan("P", "app", price={"amount": 1, "currency": "XOF", "interval": "decade"}),  # type: ignore[typeddict-item]
         "interval",
     ),
     (
@@ -155,3 +158,53 @@ def test_c4_every_local_rule_the_api_would_enforce_later(
 def test_c5_ids_the_api_would_refuse_are_refused_at_declaration(bad: str) -> None:
     with pytest.raises(ItajaConfigError):
         feature(bad, "boolean")
+
+
+_MONTHLY: Any = {"amount": 1, "currency": "XOF", "interval": "month"}
+
+
+@pytest.mark.parametrize("bad", ["", "   ", "\t\n", "x" * 201])
+def test_c7_a_blank_or_too_long_plan_name_is_refused(bad: str) -> None:
+    with pytest.raises(ItajaConfigError) as caught:
+        plan(bad, "app", default=True)
+    assert caught.value.code == "CATALOG_DECLARATION_INVALID"
+
+
+def test_c7_the_name_is_required_and_has_no_id_keyword() -> None:
+    with pytest.raises(TypeError):
+        plan(group="app", default=True)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        plan("Pro", "app", id="pro", price=_MONTHLY)  # type: ignore[call-arg]
+
+
+def test_c7_a_name_of_200_characters_is_accepted_and_trimmed() -> None:
+    assert plan("  " + "x" * 200 + " ", "app", default=True).name == "x" * 200
+
+
+@pytest.mark.parametrize("twin", ["pro", "PRO", " Pro ", "pRo"])
+def test_c7_names_that_differ_only_by_case_or_spacing_are_duplicates(twin: str) -> None:
+    with pytest.raises(ItajaConfigError, match="declared twice") as caught:
+        to_catalog_document([plan("Pro", "app", price=_MONTHLY), plan(twin, "app", price=_MONTHLY)])
+    assert caught.value.code == "CATALOG_DECLARATION_INVALID"
+
+
+def test_c7_inner_whitespace_is_collapsed_when_comparing() -> None:
+    with pytest.raises(ItajaConfigError, match="declared twice"):
+        to_catalog_document([plan("Pro Max", "app", price=_MONTHLY), plan("pro   max", "app", price=_MONTHLY)])
+
+
+def test_c7_the_same_name_in_two_groups_is_allowed() -> None:
+    document = to_catalog_document([plan("Pro", "app", price=_MONTHLY), plan("Pro", "api", price=_MONTHLY)])
+    assert [[p["name"] for p in product["plans"]] for product in document["products"]] == [["Pro"], ["Pro"]]
+
+
+def test_c7_the_emitted_document_has_no_plan_id() -> None:
+    document = to_catalog_document(declare())
+    plans = [p for product in document["products"] for p in product.get("plans", [])]
+    assert plans and all("id" not in p and p["name"] for p in plans)
+    jsonschema.validate(document, spec_json("catalog.schema.json"))
+
+
+def test_c7_errors_name_the_plan() -> None:
+    with pytest.raises(ItajaConfigError, match='Plan "Pro Max" has no price'):
+        plan("Pro Max", "app")

@@ -398,7 +398,8 @@ class Itaja:
     def subscribe(
         self, *, customer_id: str, plan: str, success_url: str | None = None, cancel_url: str | None = None
     ) -> Any:
-        """One call for new, upgrade, downgrade, cancel-to-free. Not served by the API yet (itaja-services#465)."""
+        """One call for new, upgrade, downgrade, cancel-to-free. ``plan`` is the plan's name as declared in
+        the catalogue (``"Pro"``, case-insensitive). Not served by the API yet (itaja-services#465)."""
         raise self._not_yet("subscribe()", 465)
 
     def check(self, *, customer_id: str, feature: str) -> Any:

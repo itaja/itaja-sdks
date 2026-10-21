@@ -15435,7 +15435,7 @@
     },
     "/api/v1/subscriptions/subscribe": {
       "post": {
-        "description": "**In short:** One call moves a customer to a plan of a subscription product — new subscription, upgrade, downgrade, cancel to the free plan, or undo a pending change.\n\n`customerId` is Itaja's id or your own. `outcome` says what happened:\n\n- `payment_required` — no subscription yet, paid plan: send the customer to `paymentUrl` (bound to this customer, it returns to your `successUrl` / `cancelUrl`). The URL expires at `paymentUrlExpiresAt` (24 h): past it the pay page answers `410`, call `subscribe` again. Nothing is created until the first period is paid.\n- `on_default_plan` — no subscription, the product's default (free) plan: nothing is written, the customer is on it.\n- `upgrade_pending` — a higher plan: the prorated difference is invoiced now and payable at `paymentUrl`; the new plan applies once it is paid.\n- `change_scheduled` — a lower plan (or any change during a free trial): applied at `scheduledChange.effectiveAt`, the next period is billed at the new price.\n- `cancel_scheduled` — the default plan: the subscription ends at the end of the paid period.\n- `pending_cleared` — the current plan while a change or a cancel was pending: both are undone and the next period is billed again.\n- `unchanged` — nothing to do; a replay of the same call lands here.\n\n`404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.",
+        "description": "**In short:** One call moves a customer to a plan of a subscription product — new subscription, upgrade, downgrade, cancel to the free plan, or undo a pending change.\n\n`customerId` is Itaja's id or your own. Name the plan with **exactly one** of `plan` — the name you declared it under in code (`PUT /v1/catalog`), compared trimmed and case-insensitively among the plans on sale — or `planId`, Itaja's id (a plan made in the dashboard). Both or neither: `422 VALIDATION_ERROR`. `productId` disambiguates a name sold by several products. `data.plan` echoes the plan targeted (`id`, `name`, `productId`).\n\n`outcome` says what happened:\n\n- `payment_required` — no subscription yet, paid plan: send the customer to `paymentUrl` (bound to this customer, it returns to your `successUrl` / `cancelUrl`). The URL expires at `paymentUrlExpiresAt` (24 h): past it the pay page answers `410`, call `subscribe` again. Nothing is created until the first period is paid.\n- `on_default_plan` — no subscription, the product's default (free) plan: nothing is written, the customer is on it.\n- `upgrade_pending` — a higher plan: the prorated difference is invoiced now and payable at `paymentUrl`; the new plan applies once it is paid.\n- `change_scheduled` — a lower plan (or any change during a free trial): applied at `scheduledChange.effectiveAt`, the next period is billed at the new price.\n- `cancel_scheduled` — the default plan: the subscription ends at the end of the paid period.\n- `pending_cleared` — the current plan while a change or a cancel was pending: both are undone and the next period is billed again.\n- `unchanged` — nothing to do; a replay of the same call lands here.\n\n`404 PLAN_NOT_FOUND` / `CUSTOMER_NOT_FOUND` outside the key's reach (and for a `plan` name no plan on sale carries — a plan renamed in code is a new plan, the old name answers 404). `409 AMBIGUOUS_PLAN` when a key not scoped to a product names a plan sold by several products: pass `productId`. `409 PLAN_CHANGE_NOT_SUPPORTED` across currencies or billing intervals, `409 INVALID_CONTRACT_TRANSITION` on a paused subscription, `409 CONTRACT_HELD_BY_PROVIDER` on a card-billed one.",
         "tags": [
           "Subscriptions"
         ],
@@ -15447,8 +15447,7 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "customerId",
-                  "planId"
+                  "customerId"
                 ],
                 "properties": {
                   "customerId": {
@@ -15456,9 +15455,22 @@
                     "maxLength": 255,
                     "type": "string"
                   },
+                  "plan": {
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
                   "planId": {
                     "minLength": 1,
                     "maxLength": 64,
+                    "description": "Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
+                  "productId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`.",
                     "type": "string"
                   },
                   "successUrl": {
@@ -15478,8 +15490,7 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "customerId",
-                  "planId"
+                  "customerId"
                 ],
                 "properties": {
                   "customerId": {
@@ -15487,9 +15498,22 @@
                     "maxLength": 255,
                     "type": "string"
                   },
+                  "plan": {
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
                   "planId": {
                     "minLength": 1,
                     "maxLength": 64,
+                    "description": "Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
+                  "productId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`.",
                     "type": "string"
                   },
                   "successUrl": {
@@ -15509,8 +15533,7 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "customerId",
-                  "planId"
+                  "customerId"
                 ],
                 "properties": {
                   "customerId": {
@@ -15518,9 +15541,22 @@
                     "maxLength": 255,
                     "type": "string"
                   },
+                  "plan": {
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The name of a plan declared in code (`PUT /v1/catalog`), compared trimmed and case-insensitively, among the plans on sale. Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
                   "planId": {
                     "minLength": 1,
                     "maxLength": 64,
+                    "description": "Itaja's id of the plan (a plan made in the dashboard, or any plan). Exactly one of `plan` and `planId`.",
+                    "type": "string"
+                  },
+                  "productId": {
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Itaja's id of the product. With `plan`: says which product's plan is meant when several products sell a plan of that name (`409 AMBIGUOUS_PLAN` otherwise). With `planId`: the plan must belong to it, else `404 PLAN_NOT_FOUND`.",
                     "type": "string"
                   },
                   "successUrl": {
@@ -15562,7 +15598,8 @@
                         "paymentUrl",
                         "paymentUrlExpiresAt",
                         "scheduledChange",
-                        "onDefaultPlan"
+                        "onDefaultPlan",
+                        "plan"
                       ],
                       "properties": {
                         "outcome": {
@@ -15894,6 +15931,25 @@
                         },
                         "onDefaultPlan": {
                           "type": "boolean"
+                        },
+                        "plan": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "name",
+                            "productId"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "productId": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     }
@@ -17932,18 +17988,14 @@
                               "items": {
                                 "type": "object",
                                 "required": [
-                                  "id",
                                   "name"
                                 ],
                                 "properties": {
-                                  "id": {
-                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                                    "description": "Your own identifier for this item. Unique within its kind.",
-                                    "type": "string"
-                                  },
                                   "name": {
                                     "minLength": 1,
                                     "maxLength": 200,
+                                    "pattern": "\\S",
+                                    "description": "The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`.",
                                     "type": "string"
                                   },
                                   "description": {
@@ -18319,18 +18371,14 @@
                               "items": {
                                 "type": "object",
                                 "required": [
-                                  "id",
                                   "name"
                                 ],
                                 "properties": {
-                                  "id": {
-                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                                    "description": "Your own identifier for this item. Unique within its kind.",
-                                    "type": "string"
-                                  },
                                   "name": {
                                     "minLength": 1,
                                     "maxLength": 200,
+                                    "pattern": "\\S",
+                                    "description": "The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`.",
                                     "type": "string"
                                   },
                                   "description": {
@@ -18706,18 +18754,14 @@
                               "items": {
                                 "type": "object",
                                 "required": [
-                                  "id",
                                   "name"
                                 ],
                                 "properties": {
-                                  "id": {
-                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                                    "description": "Your own identifier for this item. Unique within its kind.",
-                                    "type": "string"
-                                  },
                                   "name": {
                                     "minLength": 1,
                                     "maxLength": 200,
+                                    "pattern": "\\S",
+                                    "description": "The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`.",
                                     "type": "string"
                                   },
                                   "description": {

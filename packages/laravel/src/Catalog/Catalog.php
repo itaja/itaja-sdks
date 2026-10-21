@@ -53,8 +53,8 @@ final class Catalog
                         throw Support::error("Group \"{$gid}\" is declared with two different names.");
                     }
                     foreach ($groups[$gid]['plans'] as $existing) {
-                        if ($existing->id === $item->id) {
-                            throw Support::error("Plan \"{$item->id}\" is declared twice in group \"{$gid}\".");
+                        if ($existing->key() === $item->key()) {
+                            throw Support::error("Plan \"{$item->name}\" is declared twice in group \"{$gid}\" (as \"{$existing->name}\"): a plan's name is its identity, compared case-insensitively and ignoring extra spaces.");
                         }
                         if ($item->default && $existing->default) {
                             throw Support::error("Group \"{$gid}\" has two default plans; keep one.");
@@ -103,7 +103,7 @@ final class Catalog
                 foreach ($plans as $plan) {
                     foreach ($plan->includes as $inclusion) {
                         if (! isset($features[$inclusion['feature']])) {
-                            throw Support::error("Plan \"{$plan->id}\" includes feature \"{$inclusion['feature']}\", which the catalogue does not declare. Add the feature to the catalogue.");
+                            throw Support::error("Plan \"{$plan->name}\" includes feature \"{$inclusion['feature']}\", which the catalogue does not declare. Add the feature to the catalogue.");
                         }
                     }
                 }
@@ -113,7 +113,6 @@ final class Catalog
                     'name' => $group->name,
                     'description' => $group->description,
                     'plans' => array_map(fn (Plan $p): array => array_filter([
-                        'id' => $p->id,
                         'name' => $p->name,
                         'description' => $p->description,
                         'price' => $p->price,

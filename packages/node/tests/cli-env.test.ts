@@ -60,7 +60,7 @@ export default createItaja({
   apiKey: process.env.ITAJA_API_KEY,
   webhookSecret: process.env.ITAJA_WEBHOOK_SECRET,
   baseUrl: process.env.ITAJA_API_URL,
-  catalog: [m, plan({ id: "free", group: app, default: true, includes: [m({ limit: 1 })] })],
+  catalog: [m, plan({ name: "Free", group: app, default: true, includes: [m({ limit: 1 })] })],
 });
 `,
   );

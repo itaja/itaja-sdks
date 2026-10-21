@@ -129,6 +129,8 @@ final class Itaja
 
     /**
      * One call for new, upgrade, downgrade, cancel-to-free and resume.
+     * `$plan` is the plan's NAME as declared (`Plan::make('Pro', ...)`),
+     * matched case-insensitively within its product; Itaja owns the plan's id.
      * Not served by the API yet (itaja/itaja-services#465).
      */
     public function subscribe(string $customerId, string $plan, ?string $successUrl = null, ?string $cancelUrl = null): never

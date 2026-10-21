@@ -3,10 +3,12 @@
  * `toCatalogDocument` that turns what you declared into the canonical JSON
  * `PUT /v1/catalog` takes (`spec/catalog.schema.json`).
  *
- * Every id is **yours** (`free`, `pro`, `messages`) and is inferred as a literal
- * type, so `itaja.credits.grant({ credits: "tokens" })` is checked at compile
- * time. Amounts are in **major units** of their currency, as on every product
- * route of the API (`5000` XOF, `9.99` EUR).
+ * Every id is **yours** (`app`, `messages`, `tokens`) and is inferred as a
+ * literal type, so `itaja.credits.grant({ credits: "tokens" })` is checked at
+ * compile time. A plan has no id: its **name** (`"Pro"`) is its identity inside
+ * its group, compared case-insensitively, and is inferred as a literal too.
+ * Amounts are in **major units** of their currency, as on every product route
+ * of the API (`5000` XOF, `9.99` EUR).
  */
 import { ItajaConfigError } from "./errors.js";
 
@@ -82,11 +84,11 @@ export function group<const Id extends string>(input: {
   return { kind: "group", ...input };
 }
 
-export interface Plan<Id extends string = string, G extends string = string> {
+export interface Plan<Name extends string = string, G extends string = string> {
   readonly kind: "plan";
-  readonly id: Id;
+  /** The plan's identity inside its group: there is no plan id (`"Pro"` and `" pro "` are the same plan). */
+  readonly name: Name;
   readonly group: Group<G>;
-  readonly name: string;
   readonly description?: string | null;
   readonly price?: Money & { interval: Interval; intervalCount?: number };
   readonly trial?: { days: number };
@@ -95,30 +97,32 @@ export interface Plan<Id extends string = string, G extends string = string> {
 }
 
 /**
- * A plan of a group. The group's `default` plan is its free fallback and may
- * omit `price`; every other plan needs one.
+ * A plan of a group, identified by its `name` — unique in its group, compared
+ * trimmed, inner spaces collapsed and case-insensitively. Itaja assigns the
+ * plan's system id; renaming a plan declares a new plan (the old one is
+ * archived). The group's `default` plan is its free fallback and may omit
+ * `price`; every other plan needs one.
  */
-export function plan<const Id extends string, const G extends string>(input: {
-  id: Id;
+export function plan<const Name extends string, const G extends string>(input: {
+  /** The plan's identity in its group, as the buyer reads it (`"Pro"`). 1 to 200 characters. */
+  name: Name;
   /** The group, or its id — then the group is named after it. */
   group: Group<G> | G;
-  name?: string;
   description?: string | null;
   price?: Money & { interval: Interval; intervalCount?: number };
   trial?: { days: number };
   default?: boolean;
   includes?: readonly FeatureInclusion[];
-}): Plan<Id, G> {
-  assertId(input.id, "plan");
+}): Plan<Name, G> {
+  assertPlanName(input.name);
   const g = typeof input.group === "string" ? group({ id: input.group, name: humanize(input.group) }) : input.group;
   if (!input.default && input.price === undefined) {
-    throw configError(`Plan "${input.id}" has no price: only the group's default plan may be free.`);
+    throw configError(`Plan "${input.name}" has no price: only the group's default plan may be free.`);
   }
   return {
     kind: "plan",
-    id: input.id,
+    name: input.name,
     group: g,
-    name: input.name ?? humanize(input.id),
     ...(input.description !== undefined ? { description: input.description } : {}),
     ...(input.price ? { price: input.price } : {}),
     ...(input.trial ? { trial: input.trial } : {}),
@@ -259,8 +263,12 @@ export function toCatalogDocument(items: readonly CatalogItem[]): CatalogDocumen
         } else if (entry.group.name !== item.group.name) {
           throw configError(`Group "${item.group.id}" is declared with two different names.`);
         }
-        if (entry.plans.some((p) => p.id === item.id)) {
-          throw configError(`Plan "${item.id}" is declared twice in group "${item.group.id}".`);
+        const key = normalizePlanName(item.name);
+        const twin = entry.plans.find((p) => normalizePlanName(p.name) === key);
+        if (twin) {
+          throw configError(
+            `Plan "${item.name}" is declared twice in group "${item.group.id}" (same name as "${twin.name}": plan names are compared trimmed and case-insensitively).`,
+          );
         }
         if (item.default && entry.plans.some((p) => p.default)) {
           throw configError(`Group "${item.group.id}" has two default plans; keep one.`);
@@ -304,7 +312,7 @@ export function toCatalogDocument(items: readonly CatalogItem[]): CatalogDocumen
         for (const inc of p.includes) {
           if (!features.has(inc.feature)) {
             throw configError(
-              `Plan "${p.id}" includes feature "${inc.feature}", which the catalogue does not declare. Add the feature to \`catalog\`.`,
+              `Plan "${p.name}" includes feature "${inc.feature}", which the catalogue does not declare. Add the feature to \`catalog\`.`,
             );
           }
         }
@@ -315,7 +323,6 @@ export function toCatalogDocument(items: readonly CatalogItem[]): CatalogDocumen
         name: g.name,
         ...(g.description !== undefined ? { description: g.description } : {}),
         plans: plans.map((p) => ({
-          id: p.id,
           name: p.name,
           ...(p.description !== undefined ? { description: p.description } : {}),
           ...(p.price ? { price: p.price } : {}),
@@ -354,8 +361,8 @@ export function toCatalogDocument(items: readonly CatalogItem[]): CatalogDocumen
 // ── Typed ids, read off a declaration ───────────────────────────────────────
 
 type Items = readonly CatalogItem[];
-/** The plan ids of a catalogue. */
-export type PlanIdOf<C extends Items> = Extract<C[number], Plan>["id"];
+/** The plan names of a catalogue — what `subscribe({ plan })` takes. */
+export type PlanNameOf<C extends Items> = Extract<C[number], Plan>["name"];
 /** The credit ids of a catalogue (from `credits()` or the packs selling them). */
 export type CreditsIdOf<C extends Items> =
   | Extract<C[number], Credits>["id"]
@@ -377,6 +384,22 @@ function assertId(id: string, what: string): void {
     throw configError(
       `Invalid ${what} id "${id}": 1 to 64 letters, digits, "_" or "-", starting with a letter or a digit.`,
     );
+  }
+}
+
+const PLAN_NAME_MAX = 200;
+
+/** A plan's identity: trimmed, inner whitespace collapsed, lowercased (as the API compares it). */
+function normalizePlanName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function assertPlanName(name: unknown): void {
+  if (typeof name !== "string" || name.trim() === "") {
+    throw configError(`A plan needs a name: it is the plan's identity in its group (there is no plan id), e.g. plan({ name: "Pro", ... }).`);
+  }
+  if (name.length > PLAN_NAME_MAX) {
+    throw configError(`Plan name "${name.slice(0, 40)}…" is ${name.length} characters long: at most ${PLAN_NAME_MAX}.`);
   }
 }
 

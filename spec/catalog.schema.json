@@ -81,18 +81,14 @@
                 "items": {
                   "type": "object",
                   "required": [
-                    "id",
                     "name"
                   ],
                   "properties": {
-                    "id": {
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                      "description": "Your own identifier for this item. Unique within its kind.",
-                      "type": "string"
-                    },
                     "name": {
                       "minLength": 1,
                       "maxLength": 200,
+                      "pattern": "\\S",
+                      "description": "The plan's identity inside its product — there is no plan `id`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively (`Pro` and ` pro ` are the same plan). Renaming a plan declares a new plan: the old one is taken off sale at the push, its subscribers stay on it. `subscribe` takes this name as `plan`.",
                       "type": "string"
                     },
                     "description": {

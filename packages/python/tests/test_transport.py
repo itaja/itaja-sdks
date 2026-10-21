@@ -372,7 +372,7 @@ def test_k3_the_calls_the_api_does_not_serve_yet_say_so() -> None:
     r = Recorder([])
     itaja = r.client()
     for call in (
-        lambda: itaja.subscribe(customer_id="cus_1", plan="pro"),
+        lambda: itaja.subscribe(customer_id="cus_1", plan="Pro"),
         lambda: itaja.check(customer_id="cus_1", feature="export"),
         lambda: itaja.report(customer_id="cus_1", feature="messages"),
     ):
@@ -393,7 +393,7 @@ def test_push_dry_run_sends_the_flag_and_the_declared_catalogue() -> None:
 
     messages = feature("messages", "metered")
     r = Recorder(lambda _: ok({"summary": {}, "changes": []}))
-    itaja = r.client(catalog=[messages, plan("free", group("app", "App"), default=True, includes=[messages(limit=1)])])
+    itaja = r.client(catalog=[messages, plan("Free", group("app", "App"), default=True, includes=[messages(limit=1)])])
     itaja.push(dry_run=True)
     itaja.push()
     dry, real = r.requests

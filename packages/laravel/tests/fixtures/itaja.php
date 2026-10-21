@@ -9,6 +9,6 @@ $app = Group::make('app', 'My App');
 
 return [
     $messages,
-    Plan::make('free', $app, default: true, includes: [$messages(limit: 100, reset: 'month')]),
-    Plan::make('pro', $app, price: ['amount' => 5000, 'currency' => 'XOF', 'interval' => 'month'], includes: [$messages(limit: 2000, reset: 'month')]),
+    Plan::make('Free', $app, default: true, includes: [$messages(limit: 100, reset: 'month')]),
+    Plan::make('Pro', $app, price: ['amount' => 5000, 'currency' => 'XOF', 'interval' => 'month'], includes: [$messages(limit: 2000, reset: 'month')]),
 ];
