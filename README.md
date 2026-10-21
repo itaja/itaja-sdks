@@ -7,10 +7,10 @@ webhook route, **react** to typed events — as fixed by
 
 | Package | Registry | Folder | Status |
 |---|---|---|---|
-| `@itaja/node` | npm | [`packages/node`](packages/node) | 0.2.0 |
-| `itaja` | PyPI | [`packages/python`](packages/python) | 0.2.0 |
+| `@itaja/node` | npm | [`packages/node`](packages/node) | 0.3.0 |
+| `itaja` | PyPI | [`packages/python`](packages/python) | 0.3.0 |
 | `itaja` | pub.dev | `packages/dart` | planned |
-| `itaja/itaja-laravel` | Packagist | [`packages/laravel`](packages/laravel) | 0.2.0 |
+| `itaja/itaja-laravel` | Packagist | [`packages/laravel`](packages/laravel) | 0.3.0 |
 
 ## Shared contracts — `spec/`
 
