@@ -14,6 +14,7 @@ from .catalog import (
     feature,
     group,
     license,
+    normalize_name,
     plan,
     to_catalog_document,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "group",
     "license",
     "mode_of_key",
+    "normalize_name",
     "plan",
     "sign_payload",
     "to_catalog_document",

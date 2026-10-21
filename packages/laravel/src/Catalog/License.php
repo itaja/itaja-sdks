@@ -2,12 +2,11 @@
 
 namespace Itaja\Laravel\Catalog;
 
-/** A licence key that unlocks your software on a number of devices. */
+/** A licence key that unlocks your software on a number of devices, identified by its name. */
 final class License
 {
     /** @param  array{amount: int|float, currency: string}  $price */
     private function __construct(
-        public readonly string $id,
         public readonly string $name,
         public readonly ?string $description,
         public readonly array $price,
@@ -22,19 +21,18 @@ final class License
      * @param  string|null  $duration  "lifetime", "days-N" or "from-first-activation-days-N"
      */
     public static function make(
-        string $id,
         string $name,
         array $price,
         ?int $devices,
         ?string $duration = null,
         ?string $description = null,
     ): self {
-        Support::assertId($id, 'license');
-        Support::assertMoney($price, "License \"{$id}\"");
+        Support::assertName($name, 'product', "License::make('Desktop app', price: \$price, devices: 3)");
+        Support::assertMoney($price, "License \"{$name}\"");
         if ($duration !== null && preg_match('/^(lifetime|days-\d+|from-first-activation-days-\d+)$/', $duration) !== 1) {
-            throw Support::error("License \"{$id}\": duration must be \"lifetime\", \"days-N\" or \"from-first-activation-days-N\".");
+            throw Support::error("License \"{$name}\": duration must be \"lifetime\", \"days-N\" or \"from-first-activation-days-N\".");
         }
 
-        return new self($id, $name, $description, $price, $devices, $duration);
+        return new self($name, $description, $price, $devices, $duration);
     }
 }

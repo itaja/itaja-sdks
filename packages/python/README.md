@@ -53,11 +53,11 @@ import os
 from itaja import create_itaja, feature, group, plan
 
 # What the customer can do
-messages = feature("messages", "metered")
-export = feature("export", "boolean")
+messages = feature("Messages", "metered")
+export = feature("Export", "boolean")
 
 # One customer holds one plan of a group
-app = group("app", "My App")
+app = group("My App")
 
 free = plan(
     "Free", app,
@@ -79,10 +79,14 @@ itaja = create_itaja(
 )
 ```
 
-Your ids (`"app"`, `"messages"`) are yours; a plan has no id, its name (`"Pro"`) identifies it. Amounts are in **major units**
-(`5000` XOF, `9.99` EUR), as in the API. Mistakes the API would refuse — an
-undeclared feature, two default plans, a paid plan without a price, an invalid
-id — raise `ItajaConfigError` as soon as the module is imported.
+Everything is identified by its **name** — there is no id to choose. Names are compared
+trimmed, inner spaces collapsed and case-insensitively (`"Pro"` and `" pro "` are the same
+plan). Product names are unique across all your products, feature names across your features,
+plan names within their group, pack names within their credits product. Rename an item and you
+declare a new one; the old one is archived. Amounts are in **major units** (`5000` XOF, `9.99`
+EUR), as in the API. Mistakes the API would refuse — a blank or over-long name (200 characters at
+most), two items of one name, an undeclared feature, two default plans, a paid plan without a
+price — raise `ItajaConfigError` as soon as the module is imported.
 
 ### 2. Push it
 
@@ -196,9 +200,6 @@ team = plan(
 ```
 
 - `interval`: `week` · `month` · `quarter` · `year`. `reset` on a quota: `day` · `week` · `month` · `year`.
-- A plan is identified by its **name** inside its group (`"Pro"`, compared case-insensitively,
-  extra whitespace ignored): Itaja assigns the system id. Renaming a plan creates a new plan and
-  archives the old one. Groups (products), credit packs and licences keep their own `id`.
 - A plan without a `price` must be `default=True`; a group has at most one default.
 - `trial_days` gives a free period before the first charge.
 
@@ -209,8 +210,9 @@ itaja.subscriptions.cancel(subscription_id)  # at period end
 
 Events: `invoice.paid` · `invoice.payment_failed` · `subscription.past_due` · `subscription.canceled`.
 
-> **Coming with the API:** `itaja.subscribe(customer_id=..., plan="Pro")` (new, upgrade, downgrade,
-> cancel-to-free in one call, the plan named as in your catalogue), `check()` and `report()` for entitlements exist and
+> **Coming with the API:** `itaja.subscribe(customer_id=..., plan="Pro", product="My App")` (new,
+> upgrade, downgrade, cancel-to-free in one call; the plan named as in your catalogue, `product`
+> optional, to pick between products that sell a plan of that name), `check()` and `report()` for entitlements exist and
 > raise `NOT_YET_AVAILABLE` until the API serves them
 > ([itaja-services #465, #466](https://github.com/itaja/itaja-services/issues/465)).
 
@@ -221,24 +223,24 @@ A currency your app spends as the customer uses it, sold in packs.
 ```python
 from itaja import credit_pack, credits
 
-tokens = credits("tokens", "AI tokens", coin_name="Tokens")
+tokens = credits("AI tokens", coin_name="Tokens")
 
-small = credit_pack("small", tokens, 100, {"amount": 1000, "currency": "XOF"})
-large = credit_pack("large", tokens, 1000, {"amount": 8000, "currency": "XOF"})
+small = credit_pack("100 tokens", tokens, 100, {"amount": 1000, "currency": "XOF"})
+large = credit_pack("1000 tokens", tokens, 1000, {"amount": 8000, "currency": "XOF"})
 ```
 
 ```python
 checkout = itaja.credits.buy(
-    pack="small",
+    pack="100 tokens",  # the pack's name, as the buyer reads it
     customer_id=customer_id,
     home_url="https://shop.example/thanks",
-    product="tokens",
+    product="AI tokens",
     success_url="https://shop.example/credits/thanks",  # optional, as on checkout.create
 )
 # redirect the buyer to checkout["checkoutUrl"]
 
-itaja.credits.consume(customer_id=customer_id, amount=3, product="tokens")
-itaja.credits.balance(customer_id=customer_id, product="tokens")
+itaja.credits.consume(customer_id=customer_id, amount=3, product="AI tokens")
+itaja.credits.balance(customer_id=customer_id, product="AI tokens")
 ```
 
 Events: `credits.granted` · `credits.consumed` · `credits.expired` · `credits.low` · `credits.clawed_back`.
@@ -251,7 +253,7 @@ Software that unlocks on a number of devices.
 from itaja import license
 
 desktop = license(
-    "desktop", "Desktop app",
+    "Desktop app",
     price={"amount": 25000, "currency": "XOF"},
     devices=3,             # None = unlimited
     duration="days-365",   # "lifetime" · "days-N" · "from-first-activation-days-N"
@@ -259,8 +261,8 @@ desktop = license(
 ```
 
 ```python
-itaja.licenses.issue(product="desktop", customer_id=customer_id)
-itaja.licenses.revoke(key_id, product="desktop", reason="chargeback")
+itaja.licenses.issue(product="Desktop app", customer_id=customer_id)
+itaja.licenses.revoke(key_id, product="Desktop app", reason="chargeback")
 ```
 
 Events: `license.issued` · `activated` · `deactivated` · `revoked` · `expired` · `rotated` · `suspended` · `resumed` · `updated`.
@@ -296,7 +298,9 @@ itaja.customers.get("user_42")   # your own customer id works too
 itaja.request("GET", "/me")      # any endpoint the helpers do not cover
 ```
 
-A product made in the dashboard is named by its Itaja id: `product_id="prd_…"`.
+Products and packs are referenced by their name at runtime too: the SDK resolves
+`product="AI tokens"` to Itaja's product once, by comparing the normalised name with what your
+last `push` created.
 
 Verify a delivery yourself, without the route:
 

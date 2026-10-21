@@ -4,8 +4,8 @@ use Itaja\Laravel\Catalog\Feature;
 use Itaja\Laravel\Catalog\Group;
 use Itaja\Laravel\Catalog\Plan;
 
-$messages = Feature::metered('messages');
-$app = Group::make('app', 'My App');
+$messages = Feature::metered('Messages');
+$app = Group::make('My App');
 
 return [
     $messages,

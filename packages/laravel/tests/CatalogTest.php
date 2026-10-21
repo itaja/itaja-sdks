@@ -14,13 +14,15 @@
  *     order of every list is.
  * C3. A plan including an undeclared feature is sent anyway (422 at deploy time).
  * C4. Two default plans in a group, a paid plan without a price, a boolean
- *     feature with a limit, a metered one without, credits without a pack, or
- *     a product id used twice are accepted locally.
- * C5. An invalid id passes locally and fails on the server.
+ *     feature with a limit, a metered one without, or credits without a pack
+ *     are accepted locally.
+ * C5. A blank or over-long name passes locally and fails on the server.
  * C6. The same declaration serialises differently twice (order, null keys).
- * C7. A plan is sent with an id, or two plans whose names differ only by case
- *     or whitespace are accepted in one group (the API treats them as one), or
- *     a blank / over-long name passes locally.
+ * C7. An id (or a pack label) is accepted or emitted anywhere: features,
+ *     products, packs and plans are identified by their name only.
+ * C8. Two items of one scope whose names differ only by case or whitespace
+ *     are accepted locally, though the API sees one — or the same plan or
+ *     pack name under two products is refused, though each is its own scope.
  */
 
 namespace Itaja\Laravel\Tests;
@@ -32,6 +34,7 @@ use Itaja\Laravel\Catalog\Feature;
 use Itaja\Laravel\Catalog\Group;
 use Itaja\Laravel\Catalog\License;
 use Itaja\Laravel\Catalog\Plan;
+use Itaja\Laravel\Catalog\Support;
 use Itaja\Laravel\Exceptions\ConfigException;
 use Opis\JsonSchema\Validator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -42,9 +45,9 @@ final class CatalogTest extends TestCase
     /** @return list<Feature|Plan|Credits|CreditPack|License> */
     private static function declare(): array
     {
-        $messages = Feature::metered('messages');
-        $export = Feature::boolean('export');
-        $app = Group::make('app', 'My App');
+        $messages = Feature::metered('Messages');
+        $export = Feature::boolean('Export');
+        $app = Group::make('My App');
         $free = Plan::make('Free', $app, default: true, includes: [$messages(limit: 100, reset: 'month')]);
         $pro = Plan::make(
             'Pro',
@@ -53,9 +56,9 @@ final class CatalogTest extends TestCase
             trialDays: 7,
             includes: [$messages(limit: 2000, reset: 'month'), $export()],
         );
-        $tokens = Credits::make('tokens', 'AI tokens', coinName: 'Tokens');
-        $small = CreditPack::make('small', $tokens, 100, ['amount' => 1000, 'currency' => 'XOF']);
-        $desktop = License::make('desktop', 'Desktop app', ['amount' => 25000, 'currency' => 'XOF'], devices: 3, duration: 'days-365');
+        $tokens = Credits::make('AI tokens', coinName: 'Tokens');
+        $small = CreditPack::make('100 tokens', $tokens, 100, ['amount' => 1000, 'currency' => 'XOF']);
+        $desktop = License::make('Desktop app', ['amount' => 25000, 'currency' => 'XOF'], devices: 3, duration: 'days-365');
 
         return [$messages, $export, $free, $pro, $small, $desktop];
     }
@@ -78,25 +81,16 @@ final class CatalogTest extends TestCase
         $this->assertTrue($result->isValid(), (string) json_encode($result->error()?->message()));
     }
 
-    public function test_c2_it_is_the_document_the_typescript_sdk_builds(): void
+    public function test_c2_it_is_byte_for_byte_the_cross_language_reference(): void
     {
         $reference = json_decode(self::spec('conformance/reference-catalog.json'), true, 512, JSON_THROW_ON_ERROR);
 
-        $this->assertSame(self::canonical($reference), self::canonical(Catalog::document(self::declare())));
-    }
-
-    /** Object keys sorted, list order kept. */
-    private static function canonical(mixed $value): mixed
-    {
-        if (! is_array($value)) {
-            return $value;
-        }
-        $value = array_map(self::canonical(...), $value);
-        if (! array_is_list($value)) {
-            ksort($value);
-        }
-
-        return $value;
+        // Same keys in the same order: every SDK emits the same bytes.
+        $this->assertSame($reference, Catalog::document(self::declare()));
+        $this->assertSame(
+            json_encode($reference, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            json_encode(Catalog::document(self::declare()), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        );
     }
 
     public function test_c6_the_same_declaration_always_serialises_to_the_same_bytes(): void
@@ -107,12 +101,21 @@ final class CatalogTest extends TestCase
 
     public function test_c3_a_plan_including_an_undeclared_feature_is_refused_locally(): void
     {
-        $messages = Feature::metered('messages');
-        $plan = Plan::make('Free', 'app', default: true, includes: [$messages(limit: 1)]);
+        $seats = Feature::metered('Seats');
+        $plan = Plan::make('Free', 'My App', default: true, includes: [$seats(limit: 1)]);
 
         $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('includes feature "messages", which the catalogue does not declare');
+        $this->expectExceptionMessage('includes feature "Seats", which the catalogue does not declare');
         Catalog::document([$plan]);
+    }
+
+    public function test_c3_includes_match_the_declared_feature_by_normalised_name(): void
+    {
+        $declared = Feature::metered('Messages');
+        $spelledOtherwise = Feature::metered(' messages ');
+        $document = Catalog::document([$declared, Plan::make('Free', 'My App', default: true, includes: [$spelledOtherwise(limit: 1)])]);
+
+        $this->assertSame([['name' => 'Messages', 'type' => 'metered']], $document['features']);
     }
 
     /** @return iterable<string, array{callable(): mixed, string}> */
@@ -125,19 +128,11 @@ final class CatalogTest extends TestCase
         yield 'a paid plan without a price' => [fn () => Plan::make('Pro', 'app'), 'has no price'];
         yield 'a boolean feature with a limit' => [fn () => Feature::boolean('export')(limit: 3), 'is boolean'];
         yield 'a metered feature without a limit' => [fn () => Feature::metered('messages')(), 'is metered'];
-        yield 'credits without a pack' => [fn () => Catalog::document([Credits::make('tokens', 'Tokens')]), 'has no pack'];
-        yield 'a product id used twice' => [fn () => Catalog::document([
-            License::make('x', 'X', ['amount' => 1, 'currency' => 'XOF'], devices: 1),
-            Credits::make('x', 'X'),
-        ]), 'is used twice'];
-        yield 'a plan declared twice (case and spaces ignored)' => [fn () => Catalog::document([
-            Plan::make('Pro', 'app', default: true),
-            Plan::make('  pro ', 'app', price: ['amount' => 1, 'currency' => 'XOF', 'interval' => 'month']),
-        ]), 'declared twice'];
+        yield 'credits without a pack' => [fn () => Catalog::document([Credits::make('Tokens')]), 'has no pack'];
         yield 'an unknown interval' => [fn () => Plan::make('p', 'app', price: ['amount' => 1, 'currency' => 'XOF', 'interval' => 'decade']), 'interval'];
-        yield 'a malformed licence duration' => [fn () => License::make('l', 'L', ['amount' => 1, 'currency' => 'XOF'], devices: 1, duration: 'forever'), 'duration'];
-        yield 'a credit pack with no credits' => [fn () => CreditPack::make('p', Credits::make('t', 'T'), 0, ['amount' => 1, 'currency' => 'XOF']), 'at least 1'];
-        yield 'a currency that is not ISO 4217' => [fn () => License::make('l', 'L', ['amount' => 1, 'currency' => 'CFA!'], devices: 1), 'ISO 4217'];
+        yield 'a malformed licence duration' => [fn () => License::make('L', ['amount' => 1, 'currency' => 'XOF'], devices: 1, duration: 'forever'), 'duration'];
+        yield 'a credit pack with no credits' => [fn () => CreditPack::make('p', Credits::make('T'), 0, ['amount' => 1, 'currency' => 'XOF']), 'at least 1'];
+        yield 'a currency that is not ISO 4217' => [fn () => License::make('L', ['amount' => 1, 'currency' => 'CFA!'], devices: 1), 'ISO 4217'];
     }
 
     /** @param  callable(): mixed  $declare */
@@ -155,44 +150,132 @@ final class CatalogTest extends TestCase
         $this->fail('expected a ConfigException');
     }
 
-    /** @return iterable<string, array{string}> */
-    public static function badIds(): iterable
+    /** @return iterable<string, array{string, callable(string): mixed}> */
+    public static function builders(): iterable
     {
-        yield 'empty' => [''];
-        yield 'space' => ['my plan'];
-        yield 'leading dash' => ['-pro'];
-        yield 'too long' => [str_repeat('a', 65)];
-        yield 'accent' => ['pré'];
+        yield 'feature' => ['feature', fn (string $name) => Feature::boolean($name)];
+        yield 'group' => ['product', fn (string $name) => Group::make($name)];
+        yield 'plan' => ['plan', fn (string $name) => Plan::make($name, 'My App', default: true)];
+        yield 'credits' => ['product', fn (string $name) => Credits::make($name)];
+        yield 'credit pack' => ['credit pack', fn (string $name) => CreditPack::make($name, Credits::make('C'), 1, ['amount' => 1, 'currency' => 'XOF'])];
+        yield 'licence' => ['product', fn (string $name) => License::make($name, ['amount' => 1, 'currency' => 'XOF'], devices: 1)];
     }
 
-    #[DataProvider('badIds')]
-    public function test_c5_ids_the_api_would_refuse_are_refused_at_declaration(string $id): void
+    /** @param  callable(string): mixed  $build */
+    #[DataProvider('builders')]
+    public function test_c5_every_name_is_required_non_blank_and_at_most_200_characters(string $what, callable $build): void
+    {
+        foreach (['', '   ', "\t\n"] as $blank) {
+            try {
+                $build($blank);
+                $this->fail("a blank {$what} name was accepted");
+            } catch (ConfigException $e) {
+                $this->assertStringContainsString("A {$what} needs a name", $e->getMessage());
+            }
+        }
+        try {
+            $build(str_repeat('x', 201));
+            $this->fail("a 201-character {$what} name was accepted");
+        } catch (ConfigException $e) {
+            $this->assertStringContainsString('at most 200', $e->getMessage());
+        }
+        $build(str_repeat('é', 200));
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_c7_the_emitted_document_carries_no_id_nor_label_anywhere(): void
+    {
+        $keys = [];
+        $walk = function (mixed $value) use (&$walk, &$keys): void {
+            if (! is_array($value)) {
+                return;
+            }
+            foreach ($value as $key => $child) {
+                if (is_string($key)) {
+                    $keys[] = $key;
+                }
+                $walk($child);
+            }
+        };
+        $walk(Catalog::document(self::declare()));
+
+        $this->assertNotContains('id', $keys);
+        $this->assertNotContains('label', $keys);
+    }
+
+    public function test_c7_no_builder_takes_an_id(): void
+    {
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Unknown named parameter $label');
+        CreditPack::make('100 tokens', Credits::make('AI tokens'), 100, ['amount' => 1, 'currency' => 'XOF'], label: '100');
+    }
+
+    /** @return iterable<string, array{list<Feature|Plan|Credits|CreditPack|License>}> */
+    public static function productTwins(): iterable
+    {
+        $xof = ['amount' => 1, 'currency' => 'XOF'];
+        yield 'a group and a licence' => [[Plan::make('Free', 'My App', default: true), License::make(' my  app ', $xof, devices: 1)]];
+        yield 'credits and a group' => [[CreditPack::make('P', Credits::make('AI tokens'), 1, $xof), Plan::make('Free', 'AI TOKENS', default: true)]];
+        yield 'two licences' => [[License::make('Desktop app', $xof, devices: 1), License::make('desktop app', $xof, devices: 2)]];
+        yield 'two groups declared differently' => [[
+            Plan::make('Free', Group::make('App'), default: true),
+            Plan::make('Pro', Group::make('App', 'other'), price: $xof + ['interval' => 'month']),
+        ]];
+    }
+
+    /** @param  list<Feature|Plan|Credits|CreditPack|License>  $items */
+    #[DataProvider('productTwins')]
+    public function test_c8_products_share_one_namespace_across_types_compared_normalised(array $items): void
     {
         $this->expectException(ConfigException::class);
-        Feature::boolean($id);
+        $this->expectExceptionMessageMatches('/Product ".*" is declared twice/');
+        Catalog::document($items);
     }
 
-    /** @return iterable<string, array{string}> */
-    public static function badPlanNames(): iterable
+    public function test_c8_features_whose_names_differ_only_by_case_or_whitespace_are_one_feature(): void
     {
-        yield 'empty' => [''];
-        yield 'blank' => ["  \t "];
-        yield 'too long' => [str_repeat('a', 201)];
+        foreach (['messages', ' MESSAGES ', "Messages\t"] as $twin) {
+            try {
+                Catalog::document([Feature::metered('Messages'), Feature::metered($twin)]);
+                $this->fail("feature \"{$twin}\" was accepted next to \"Messages\"");
+            } catch (ConfigException $e) {
+                $this->assertStringContainsString('declared twice', $e->getMessage());
+            }
+        }
     }
 
-    #[DataProvider('badPlanNames')]
-    public function test_c7_a_blank_or_over_long_plan_name_is_refused(string $name): void
+    public function test_c8_a_group_shared_by_its_plans_or_named_by_a_string_is_one_product(): void
     {
-        $this->expectException(ConfigException::class);
-        Plan::make($name, 'app', default: true);
+        $app = Group::make('My App');
+        $document = Catalog::document([
+            Plan::make('Free', $app, default: true),
+            Plan::make('Pro', 'My App', price: ['amount' => 1, 'currency' => 'XOF', 'interval' => 'month']),
+        ]);
+
+        $this->assertCount(1, $document['products']);
+        $this->assertSame(['Free', 'Pro'], array_column($document['products'][0]['plans'], 'name'));
     }
 
-    public function test_c7_a_200_character_name_is_accepted(): void
+    public function test_c8_packs_differing_only_by_case_or_whitespace_are_one_pack_and_two_products_are_two_scopes(): void
     {
-        $this->assertSame(200, mb_strlen(Plan::make(str_repeat('é', 200), 'app', default: true)->name));
+        $xof = ['amount' => 1, 'currency' => 'XOF'];
+        $tokens = Credits::make('AI tokens');
+        foreach (['100 TOKENS', ' 100  tokens '] as $twin) {
+            try {
+                Catalog::document([CreditPack::make('100 tokens', $tokens, 100, $xof), CreditPack::make($twin, $tokens, 200, $xof)]);
+                $this->fail("pack \"{$twin}\" was accepted next to \"100 tokens\"");
+            } catch (ConfigException $e) {
+                $this->assertStringContainsString("Credit pack \"{$twin}\" is declared twice in \"AI tokens\"", $e->getMessage());
+            }
+        }
+        $document = Catalog::document([
+            CreditPack::make('100 tokens', $tokens, 100, $xof),
+            CreditPack::make('100 tokens', Credits::make('Image credits'), 100, $xof),
+        ]);
+        $this->assertSame(['AI tokens', 'Image credits'], array_column($document['products'], 'name'));
     }
 
-    public function test_c7_names_differing_only_by_case_or_inner_whitespace_are_one_plan(): void
+    public function test_c8_plans_differing_only_by_case_or_inner_whitespace_are_one_plan(): void
     {
         $this->expectException(ConfigException::class);
         $this->expectExceptionMessage('declared twice in group "app"');
@@ -202,33 +285,22 @@ final class CatalogTest extends TestCase
         ]);
     }
 
-    public function test_c7_the_same_plan_name_in_two_groups_is_allowed(): void
+    public function test_c8_the_same_plan_name_in_two_groups_is_two_plans(): void
     {
         $document = Catalog::document([
-            Plan::make('Pro', Group::make('app', 'My App'), price: ['amount' => 1, 'currency' => 'XOF', 'interval' => 'month']),
-            Plan::make('Pro', Group::make('api', 'My API'), price: ['amount' => 2, 'currency' => 'XOF', 'interval' => 'month']),
+            Plan::make('Pro', Group::make('My App'), price: ['amount' => 1, 'currency' => 'XOF', 'interval' => 'month']),
+            Plan::make('Pro', Group::make('My API'), price: ['amount' => 2, 'currency' => 'XOF', 'interval' => 'month']),
         ]);
 
+        $this->assertSame(['My App', 'My API'], array_column($document['products'], 'name'));
         $this->assertSame(['Pro'], array_column($document['products'][0]['plans'], 'name'));
         $this->assertSame(['Pro'], array_column($document['products'][1]['plans'], 'name'));
     }
 
-    public function test_c7_plans_carry_a_name_and_no_id(): void
+    public function test_normalize_composes_trims_collapses_and_lowercases(): void
     {
-        $document = Catalog::document(self::declare());
-        $plans = $document['products'][0]['plans'];
-
-        $this->assertSame(['Free', 'Pro'], array_column($plans, 'name'));
-        foreach ($plans as $plan) {
-            $this->assertArrayNotHasKey('id', $plan);
-        }
-        // Products and packs keep their id.
-        $this->assertSame(['app', 'tokens', 'desktop'], array_column($document['products'], 'id'));
-        $this->assertSame('small', $document['products'][1]['packs'][0]['id']);
-    }
-
-    public function test_c7_the_plan_name_is_trimmed(): void
-    {
-        $this->assertSame('Pro', Plan::make('  Pro ', 'app', default: true)->name);
+        $this->assertSame('ai tokens', Support::normalize("  AI \t  TOKENS "));
+        // "é" typed as e + combining acute is the same name as the precomposed "É".
+        $this->assertSame(Support::normalize("Cafe\u{0301}"), Support::normalize("CAF\u{00C9}"));
     }
 }

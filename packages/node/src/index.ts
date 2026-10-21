@@ -1,26 +1,27 @@
 export { createItaja } from "./client.js";
 export type { Itaja, ItajaOptions, ProductRef, PushResult, WriteOptions } from "./client.js";
 
-export { feature, group, plan, credits, creditPack, license, toCatalogDocument } from "./catalog.js";
+export { feature, group, plan, credits, creditPack, license, toCatalogDocument, normalizeName, NAME_MAX_LENGTH } from "./catalog.js";
 export type {
   BooleanFeature,
   CatalogDocument,
   CatalogItem,
   CreditPack,
   Credits,
-  CreditsIdOf,
+  CreditsNameOf,
   Feature,
   FeatureInclusion,
   Group,
   Interval,
   License,
   LicenseDuration,
-  LicenseIdOf,
+  GroupNameOf,
+  LicenseNameOf,
   MeteredFeature,
   Money,
   Plan,
   PlanNameOf,
-  ProductIdOf,
+  ProductNameOf,
   Reset,
 } from "./catalog.js";
 

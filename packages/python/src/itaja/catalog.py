@@ -2,15 +2,16 @@
 that turns what you declared into the canonical JSON ``PUT /v1/catalog`` takes
 (``spec/catalog.schema.json``).
 
-Every id is **yours** (``"app"``, ``"messages"``, ``"small"``). Plans have no id: a plan is
-identified by its **name** inside its product (``"Pro"``), compared case-insensitively. Amounts are in
-**major units** of their currency, as on every product route of the API
-(``5000`` XOF, ``9.99`` EUR).
+Everything is identified by its **name** (``"Messages"``, ``"My App"``, ``"AI tokens"``,
+``"Pro"``): there is no id to choose. Names are compared trimmed, inner whitespace collapsed
+and case-insensitively; Itaja assigns the system ids. Amounts are in **major units** of their
+currency, as on every product route of the API (``5000`` XOF, ``9.99`` EUR).
 """
 
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
@@ -22,7 +23,8 @@ Reset = Literal["day", "week", "month", "year"]
 
 INTERVALS: tuple[str, ...] = ("week", "month", "quarter", "year")
 RESETS: tuple[str, ...] = ("day", "week", "month", "year")
-_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+#: The longest name the API accepts, for every catalogue item.
+NAME_MAX_LENGTH = 200
 _DURATION = re.compile(r"^(lifetime|days-\d+|from-first-activation-days-\d+)$")
 _CURRENCY = re.compile(r"^[A-Za-z]{3}$")
 
@@ -47,20 +49,27 @@ class Price(_PriceRequired, total=False):
 
 
 class Inclusion(TypedDict, total=False):
+    #: The included feature's name.
     feature: str
     limit: int
     reset: Reset
+
+
+def normalize_name(name: str) -> str:
+    """A catalogue item's identity: Unicode NFC, trimmed, inner whitespace collapsed to one space,
+    lower-cased, exactly as the API compares names (and stores them as ``catalogKey``)."""
+    return " ".join(unicodedata.normalize("NFC", name).split()).lower()
 
 
 def _error(message: str) -> ItajaConfigError:
     return ItajaConfigError(message, code="CATALOG_DECLARATION_INVALID")
 
 
-def _assert_id(value: str, what: str) -> None:
-    if not isinstance(value, str) or _ID.fullmatch(value) is None:
-        raise _error(
-            f'Invalid {what} id "{value}": 1 to 64 letters, digits, "_" or "-", starting with a letter or a digit.'
-        )
+def _assert_name(name: Any, what: str, example: str) -> None:
+    if not isinstance(name, str) or not name.strip():
+        raise _error(f"A {what} needs a name: it is its identity (there is no id), e.g. {example}.")
+    if len(name) > NAME_MAX_LENGTH:
+        raise _error(f'The {what} name "{name[:40]}..." is {len(name)} characters long: at most {NAME_MAX_LENGTH}.')
 
 
 def _assert_money(price: Any, what: str) -> None:
@@ -73,44 +82,40 @@ def _assert_money(price: Any, what: str) -> None:
         raise _error(f"{what}: `currency` must be an ISO 4217 code such as XOF or EUR.")
 
 
-def _humanize(value: str) -> str:
-    words = re.sub(r"[_-]+", " ", value).strip()
-    return words[:1].upper() + words[1:]
-
-
 # ── Features ────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
 class Feature:
-    """A right. Call it to include it in a plan: ``export()`` or ``messages(limit=100, reset="month")``."""
+    """A right, identified by its name. Call it to include it in a plan: ``export()`` or
+    ``messages(limit=100, reset="month")``."""
 
-    id: str
+    name: str
     type: Literal["boolean", "metered"]
 
     def __post_init__(self) -> None:
-        _assert_id(self.id, "feature")
+        _assert_name(self.name, "feature", 'feature("Messages", "metered")')
 
     def __call__(self, limit: int | None = None, reset: Reset | None = None) -> Inclusion:
         if self.type == "boolean":
             if limit is not None or reset is not None:
-                raise _error(f'Feature "{self.id}" is boolean: include it as {self.id}(), without a limit.')
-            return {"feature": self.id}
+                raise _error(f'Feature "{self.name}" is boolean: include it with no argument, without a limit.')
+            return {"feature": self.name}
         if limit is None or isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
-            raise _error(f'Feature "{self.id}" is metered: include it with a whole, non-negative limit.')
+            raise _error(f'Feature "{self.name}" is metered: include it with a whole, non-negative limit.')
         if reset is not None and reset not in RESETS:
-            raise _error(f'Feature "{self.id}": reset must be one of {", ".join(RESETS)}.')
-        inclusion: Inclusion = {"feature": self.id, "limit": limit}
+            raise _error(f'Feature "{self.name}": reset must be one of {", ".join(RESETS)}.')
+        inclusion: Inclusion = {"feature": self.name, "limit": limit}
         if reset is not None:
             inclusion["reset"] = reset
         return inclusion
 
 
-def feature(id: str, type: Literal["boolean", "metered"]) -> Feature:
-    """``feature("export", "boolean")`` (access) or ``feature("messages", "metered")`` (a quota per period)."""
+def feature(name: str, type: Literal["boolean", "metered"]) -> Feature:
+    """``feature("Export", "boolean")`` (access) or ``feature("Messages", "metered")`` (a quota per period)."""
     if type not in ("boolean", "metered"):
-        raise _error(f'Feature "{id}": type must be "boolean" or "metered".')
-    return Feature(id, type)
+        raise _error(f'Feature "{name}": type must be "boolean" or "metered".')
+    return Feature(name, type)
 
 
 # ── Subscriptions ───────────────────────────────────────────────────────────
@@ -118,18 +123,17 @@ def feature(id: str, type: Literal["boolean", "metered"]) -> Feature:
 
 @dataclass(frozen=True)
 class Group:
-    """A subscription product: its plans exclude one another for a customer."""
+    """A subscription product, identified by its name: its plans exclude one another for a customer."""
 
-    id: str
     name: str
     description: str | None = None
 
     def __post_init__(self) -> None:
-        _assert_id(self.id, "group")
+        _assert_name(self.name, "product", 'group("My App")')
 
 
-def group(id: str, name: str, description: str | None = None) -> Group:
-    return Group(id, name, description)
+def group(name: str, description: str | None = None) -> Group:
+    return Group(name, description)
 
 
 @dataclass(frozen=True)
@@ -146,14 +150,6 @@ class Plan:
     includes: tuple[Inclusion, ...] = field(default_factory=tuple)
 
 
-_PLAN_NAME_MAX = 200
-
-
-def _plan_key(name: str) -> str:
-    """How Itaja compares plan names: trimmed, inner whitespace collapsed, case-insensitive."""
-    return " ".join(name.split()).casefold()
-
-
 def plan(
     name: str,
     group: Group | str,
@@ -164,14 +160,10 @@ def plan(
     default: bool = False,
     includes: Sequence[Inclusion] = (),
 ) -> Plan:
-    """A plan of a group, identified by its ``name`` (``"Pro"``). The group's ``default`` plan is
-    its free fallback and may omit ``price``."""
-    if not isinstance(name, str) or not name.strip():
-        raise _error("A plan needs a name: it is the plan's identity inside its product.")
-    name = name.strip()
-    if len(name) > _PLAN_NAME_MAX:
-        raise _error(f'Plan "{name[:40]}...": a plan name is at most {_PLAN_NAME_MAX} characters.')
-    g = group if isinstance(group, Group) else Group(group, _humanize(group))
+    """A plan of a group (or of the group named ``group``), identified by its ``name`` (``"Pro"``).
+    The group's ``default`` plan is its free fallback and may omit ``price``."""
+    _assert_name(name, "plan", 'plan("Pro", app, ...)')
+    g = group if isinstance(group, Group) else Group(group)
     if not default and price is None:
         raise _error(f'Plan "{name}" has no price: only the group\'s default plan may be free.')
     if price is not None:
@@ -186,41 +178,41 @@ def plan(
 
 @dataclass(frozen=True)
 class Credits:
-    """A credit currency your app spends as the buyer uses it. Sell it with ``credit_pack``."""
+    """A credit currency your app spends as the buyer uses it, identified by its name. Sell it with
+    ``credit_pack``."""
 
-    id: str
     name: str
     description: str | None = None
-    #: What the buyer calls one credit (``Tokens``, ``Coins``).
+    #: What the buyer calls one credit (``Tokens``, ``Coins``). Defaults to the name.
     coin_name: str | None = None
 
     def __post_init__(self) -> None:
-        _assert_id(self.id, "credits")
+        _assert_name(self.name, "product", 'credits("AI tokens")')
 
 
-def credits(id: str, name: str, *, description: str | None = None, coin_name: str | None = None) -> Credits:
-    return Credits(id, name, description, coin_name)
+def credits(name: str, *, description: str | None = None, coin_name: str | None = None) -> Credits:
+    return Credits(name, description, coin_name)
 
 
 @dataclass(frozen=True)
 class CreditPack:
-    id: str
+    """A bundle of credits. Its ``name`` is its identity inside its credits product and the label
+    the buyer reads."""
+
+    name: str
     of: Credits
     credits: int
     price: Money
-    label: str
     description: str | None = None
 
 
-def credit_pack(
-    id: str, of: Credits, credits: int, price: Money, *, label: str | None = None, description: str | None = None
-) -> CreditPack:
-    """A bundle of credits sold at a fixed price."""
-    _assert_id(id, "credit pack")
+def credit_pack(name: str, of: Credits, credits: int, price: Money, *, description: str | None = None) -> CreditPack:
+    """A bundle of credits sold at a fixed price, named as the buyer reads it (``"100 tokens"``)."""
+    _assert_name(name, "credit pack", 'credit_pack("100 tokens", tokens, 100, price)')
     if isinstance(credits, bool) or not isinstance(credits, int) or credits < 1:
-        raise _error(f'Credit pack "{id}": credits must be a whole number of at least 1.')
-    _assert_money(price, f'Credit pack "{id}"')
-    return CreditPack(id, of, credits, price, label or f"{credits} {of.coin_name or of.name}", description)
+        raise _error(f'Credit pack "{name}": credits must be a whole number of at least 1.')
+    _assert_money(price, f'Credit pack "{name}"')
+    return CreditPack(name, of, credits, price, description)
 
 
 # ── Licences ────────────────────────────────────────────────────────────────
@@ -228,7 +220,8 @@ def credit_pack(
 
 @dataclass(frozen=True)
 class License:
-    id: str
+    """A licence product, identified by its name."""
+
     name: str
     price: Money
     #: Devices one key unlocks; ``None`` = unlimited.
@@ -238,7 +231,6 @@ class License:
 
 
 def license(
-    id: str,
     name: str,
     *,
     price: Money,
@@ -248,11 +240,11 @@ def license(
 ) -> License:
     """A licence key that unlocks your software. ``duration``: ``"lifetime"``, ``"days-N"``,
     ``"from-first-activation-days-N"``."""
-    _assert_id(id, "license")
-    _assert_money(price, f'License "{id}"')
+    _assert_name(name, "product", 'license("Desktop app", price=..., devices=3)')
+    _assert_money(price, f'License "{name}"')
     if duration is not None and _DURATION.fullmatch(duration) is None:
-        raise _error(f'License "{id}": duration must be "lifetime", "days-N" or "from-first-activation-days-N".')
-    return License(id, name, price, devices, duration, description)
+        raise _error(f'License "{name}": duration must be "lifetime", "days-N" or "from-first-activation-days-N".')
+    return License(name, price, devices, duration, description)
 
 
 # ── The catalogue ───────────────────────────────────────────────────────────
@@ -264,143 +256,138 @@ def _drop_none(values: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in values.items() if v is not None}
 
 
+@dataclass
+class _Product:
+    kind: Literal["group", "credits", "license"]
+    decl: Group | Credits | License
+    plans: list[Plan] = field(default_factory=list)
+    packs: list[CreditPack] = field(default_factory=list)
+
+
 def to_catalog_document(items: Iterable[CatalogItem]) -> dict[str, Any]:
     """Turns a declaration into the canonical catalogue. Deterministic: the same declaration gives
-    the same JSON, in declaration order, in every language. Features are the ones you list."""
-    features: dict[str, dict[str, str]] = {}
-    groups: dict[str, tuple[Group, list[Plan]]] = {}
-    credit_products: dict[str, tuple[Credits, list[CreditPack]]] = {}
-    licenses: dict[str, License] = {}
-    order: list[tuple[str, str]] = []
+    the same JSON, in declaration order, in every language. Refuses locally what the API would
+    refuse: two items of one scope whose names match once normalised, a plan including a feature
+    the catalogue does not declare."""
+    features: dict[str, Feature] = {}
+    products: dict[str, _Product] = {}
 
-    def taken(product_id: str) -> bool:
-        return product_id in groups or product_id in credit_products or product_id in licenses
-
-    def duplicate(product_id: str) -> ItajaConfigError:
-        return _error(
-            f'Product id "{product_id}" is used twice in the catalogue '
-            "(groups, credits and licences share one id space)."
+    def product(kind: Literal["group", "credits", "license"], decl: Group | Credits | License) -> _Product:
+        key = normalize_name(decl.name)
+        known = products.get(key)
+        if known is None:
+            products[key] = _Product(kind, decl)
+            return products[key]
+        # The same product reached twice (a group shared by its plans, credits and their packs)
+        # is one product; two declarations of one name are refused.
+        if known.kind == kind and kind != "license" and known.decl == decl:
+            return known
+        raise _error(
+            f'Product "{decl.name}" is declared twice (same name as "{known.decl.name}"): product names are '
+            "unique across subscriptions, credits and licences, compared trimmed and case-insensitively."
         )
 
     for item in items:
         if isinstance(item, Feature):
-            known = features.get(item.id)
-            if known is not None and known["type"] != item.type:
-                raise _error(f'Feature "{item.id}" is declared twice with different types.')
-            features[item.id] = {"id": item.id, "type": item.type}
-        elif isinstance(item, Plan):
-            gid = item.group.id
-            if gid not in groups:
-                if taken(gid):
-                    raise duplicate(gid)
-                groups[gid] = (item.group, [])
-                order.append(("group", gid))
-            elif groups[gid][0].name != item.group.name:
-                raise _error(f'Group "{gid}" is declared with two different names.')
-            plans = groups[gid][1]
-            same = next((p for p in plans if _plan_key(p.name) == _plan_key(item.name)), None)
-            if same is not None:
+            key = normalize_name(item.name)
+            seen = features.get(key)
+            if seen is not None and seen != item:
                 raise _error(
-                    f'Plan "{item.name}" is declared twice in group "{gid}" (as "{same.name}"): plan names '
-                    "are compared case-insensitively, ignoring extra whitespace."
+                    f'Feature "{item.name}" is declared twice (same name as "{seen.name}": feature names are '
+                    "compared trimmed and case-insensitively)."
                 )
-            if item.default and any(p.default for p in plans):
-                raise _error(f'Group "{gid}" has two default plans; keep one.')
-            plans.append(item)
+            features[key] = item
+        elif isinstance(item, Plan):
+            entry = product("group", item.group)
+            twin = next((p for p in entry.plans if normalize_name(p.name) == normalize_name(item.name)), None)
+            if twin is not None:
+                raise _error(
+                    f'Plan "{item.name}" is declared twice in group "{entry.decl.name}" (same name as '
+                    f'"{twin.name}": plan names are compared trimmed and case-insensitively).'
+                )
+            if item.default and any(p.default for p in entry.plans):
+                raise _error(f'Group "{entry.decl.name}" has two default plans; keep one.')
+            entry.plans.append(item)
         elif isinstance(item, (Credits, CreditPack)):
-            currency = item if isinstance(item, Credits) else item.of
-            if currency.id not in credit_products:
-                if taken(currency.id):
-                    raise duplicate(currency.id)
-                credit_products[currency.id] = (currency, [])
-                order.append(("credits", currency.id))
+            entry = product("credits", item if isinstance(item, Credits) else item.of)
             if isinstance(item, CreditPack):
-                packs = credit_products[currency.id][1]
-                if any(p.id == item.id for p in packs):
-                    raise _error(f'Credit pack "{item.id}" is declared twice in "{currency.id}".')
-                packs.append(item)
+                pack_twin = next((p for p in entry.packs if normalize_name(p.name) == normalize_name(item.name)), None)
+                if pack_twin is not None:
+                    raise _error(
+                        f'Credit pack "{item.name}" is declared twice in "{entry.decl.name}" (same name as '
+                        f'"{pack_twin.name}": pack names are compared trimmed and case-insensitively).'
+                    )
+                entry.packs.append(item)
         elif isinstance(item, License):
-            if taken(item.id):
-                raise duplicate(item.id)
-            licenses[item.id] = item
-            order.append(("license", item.id))
+            product("license", item)
         else:
             raise _error("The catalogue accepts feature, plan, credits, credit_pack and license items only.")
 
-    products: list[dict[str, Any]] = []
-    for kind, product_id in order:
-        if kind == "group":
-            g, plans = groups[product_id]
-            for p in plans:
+    out: list[dict[str, Any]] = []
+    for entry in products.values():
+        decl = entry.decl
+        if isinstance(decl, Group):
+            for p in entry.plans:
                 for inclusion in p.includes:
-                    if inclusion["feature"] not in features:
+                    if normalize_name(inclusion["feature"]) not in features:
                         raise _error(
                             f'Plan "{p.name}" includes feature "{inclusion["feature"]}", which the catalogue '
                             "does not declare. Add the feature to the catalogue."
                         )
-            products.append(
+            out.append(
                 _drop_none(
                     {
-                        "id": g.id,
                         "type": "subscription",
-                        "name": g.name,
-                        "description": g.description,
+                        "name": decl.name,
+                        "description": decl.description,
                         "plans": [
                             _drop_none(
                                 {
                                     "name": p.name,
                                     "description": p.description,
-                                    "price": dict(p.price) if p.price is not None else None,
-                                    "trial": {"days": p.trial_days} if p.trial_days is not None else None,
                                     "default": True if p.default else None,
+                                    "trial": {"days": p.trial_days} if p.trial_days is not None else None,
+                                    "price": dict(p.price) if p.price is not None else None,
                                     "includes": [dict(i) for i in p.includes],
                                 }
                             )
-                            for p in plans
+                            for p in entry.plans
                         ],
                     }
                 )
             )
-        elif kind == "credits":
-            c, packs = credit_products[product_id]
-            if not packs:
-                raise _error(f'Credits "{c.id}" has no pack: declare at least one credit_pack for it.')
-            products.append(
+        elif isinstance(decl, Credits):
+            if not entry.packs:
+                raise _error(f'Credits "{decl.name}" has no pack: declare at least one credit_pack for it.')
+            out.append(
                 _drop_none(
                     {
-                        "id": c.id,
                         "type": "credits",
-                        "name": c.name,
-                        "description": c.description,
-                        "coinName": c.coin_name,
+                        "name": decl.name,
+                        "description": decl.description,
+                        "coinName": decl.coin_name,
                         "packs": [
                             _drop_none(
                                 {
-                                    "id": p.id,
-                                    "label": p.label,
+                                    "name": p.name,
                                     "description": p.description,
                                     "credits": p.credits,
                                     "price": dict(p.price),
                                 }
                             )
-                            for p in packs
+                            for p in entry.packs
                         ],
                     }
                 )
             )
         else:
-            lic = licenses[product_id]
-            document = _drop_none(
-                {
-                    "id": lic.id,
-                    "name": lic.name,
-                    "description": lic.description,
-                    "price": dict(lic.price),
-                    "duration": lic.duration,
-                    "type": "license",
-                }
-            )
-            document["devices"] = lic.devices  # null means unlimited: always sent
-            products.append(document)
+            document: dict[str, Any] = {"type": "license", "name": decl.name}
+            if decl.description is not None:
+                document["description"] = decl.description
+            document["devices"] = decl.devices  # null means unlimited: always sent
+            if decl.duration is not None:
+                document["duration"] = decl.duration
+            document["price"] = dict(decl.price)
+            out.append(document)
 
-    return {"features": list(features.values()), "products": products}
+    return {"features": [{"name": f.name, "type": f.type} for f in features.values()], "products": out}

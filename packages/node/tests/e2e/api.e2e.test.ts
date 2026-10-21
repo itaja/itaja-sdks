@@ -1,7 +1,7 @@
 /**
  * End to end against a real Itaja developer API (sandbox key). Declare a
  * catalogue, push it, push it again, change a price, use what was pushed by
- * its catalogue id — and leave a walk a later run is compared with.
+ * its name — and leave a walk a later run is compared with.
  *
  * Runs only when ITAJA_E2E_API_KEY (an `itjs_` key, never live) and
  * ITAJA_E2E_API_URL are set; skipped otherwise.
@@ -12,7 +12,7 @@
  * E2. A second identical push is not all `unchanged` — the SDK's document is
  *     not stable, or the diff sees phantom changes.
  * E3. A price change does not version the plan, or archives it.
- * E4. A product named by its catalogue id is not found after a push.
+ * E4. A product referenced by its name is not found after a push.
  * E5. A write the SDK retries under its key runs twice, or the same key over
  *     another body is not refused.
  * E6. An API error reaches the caller as something else than a typed
@@ -36,13 +36,13 @@ const apiKey = process.env.ITAJA_E2E_API_KEY ?? "";
 const baseUrl = process.env.ITAJA_E2E_API_URL ?? "";
 const enabled = apiKey.startsWith("itjs_") && baseUrl !== "";
 
-/** Ids unique to this run, so runs never collide on a shared sandbox. */
+/** Names unique to this run, so runs never collide on a shared sandbox. */
 const RUN = process.env.ITAJA_E2E_RUN ?? Date.now().toString(36);
-const id = (name: string) => `${name}-${RUN}`;
+const named = (name: string) => `${name}-${RUN}`;
 
 function declare(proPrice: number) {
-  const messages = feature({ id: id("messages"), type: "metered" });
-  const app = group({ id: id("app"), name: "SDK e2e app" });
+  const messages = feature({ name: named("messages"), type: "metered" });
+  const app = group({ name: named("app") });
   const free = plan({ name: "Free", group: app, default: true, includes: [messages({ limit: 100, reset: "month" })] });
   const pro = plan({
     name: "Pro",
@@ -50,9 +50,9 @@ function declare(proPrice: number) {
     price: { amount: proPrice, currency: "XOF", interval: "month" },
     includes: [messages({ limit: 2000, reset: "month" })],
   });
-  const tokens = credits({ id: id("tokens"), name: "SDK e2e tokens", coinName: "Tokens" });
-  const small = creditPack({ id: "small", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
-  const ebook = license({ id: id("ebook"), name: "SDK e2e guide", devices: null, price: { amount: 3000, currency: "XOF" } });
+  const tokens = credits({ name: named("tokens"), coinName: "Tokens" });
+  const small = creditPack({ name: "100 Tokens", of: tokens, credits: 100, price: { amount: 1000, currency: "XOF" } });
+  const ebook = license({ name: named("ebook"), devices: null, price: { amount: 3000, currency: "XOF" } });
   return [messages, free, pro, small, ebook] as const;
 }
 
@@ -92,9 +92,9 @@ describe.skipIf(!enabled)("itaja-node against a real developer API", () => {
     expect(pro).toMatchObject({ action: "changed", version: 2 });
   });
 
-  it("E4/E5 — products are used by their catalogue id; a keyed retry is one write", async () => {
+  it("E4/E5 — products are used by their name; a keyed retry is one write", async () => {
     const itaja = createItaja({ apiKey, baseUrl, catalog: declare(6000) });
-    const packs = await itaja.credits.packs({ product: id("tokens") });
+    const packs = await itaja.credits.packs({ product: ` ${named("TOKENS")} ` });
     walk.push({ step: "packs of the pushed credits", packs: packs.packs.map((p) => ({ label: p.label, coins: p.coins, amount: p.amount, currency: p.currency })) });
     expect(packs.packs).toHaveLength(1);
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://getitaja.com/schemas/catalog.schema.json",
   "title": "Itaja catalogue",
-  "description": "A merchant's catalogue declared in code: features, and products (subscription groups and their plans, credit packs, licences, one-off offers). Pushed with PUT /v1/catalog.",
+  "description": "A merchant's catalogue declared in code: features, and products (subscription groups and their plans, credit packs, licences). Every item is identified by its name — there are no ids in this document. Pushed with PUT /v1/catalog.",
   "type": "object",
   "required": [
     "products"
@@ -13,13 +13,15 @@
       "items": {
         "type": "object",
         "required": [
-          "id",
+          "name",
           "type"
         ],
         "properties": {
-          "id": {
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-            "description": "Your own identifier for this item. Unique within its kind.",
+          "name": {
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S",
+            "description": "The feature's identity — there is no feature `id`. Unique per account and mode, compared trimmed, inner spaces collapsed and case-insensitively. Renaming a feature declares a new one and archives the old one at the push.",
             "type": "string"
           },
           "type": {
@@ -44,20 +46,16 @@
           {
             "type": "object",
             "required": [
-              "id",
               "name",
               "type",
               "plans"
             ],
             "properties": {
-              "id": {
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                "description": "Your own identifier for this item. Unique within its kind.",
-                "type": "string"
-              },
               "name": {
                 "minLength": 1,
                 "maxLength": 200,
+                "pattern": "\\S",
+                "description": "The product's identity — there is no product `id`. Unique per account and mode across every product type, compared trimmed, inner spaces collapsed and case-insensitively (`AI tokens` and ` ai  TOKENS ` are the same product). Renaming a product declares a new one and archives the old one at the push. Runtime calls reference the product by this name.",
                 "type": "string"
               },
               "description": {
@@ -193,8 +191,10 @@
                         ],
                         "properties": {
                           "feature": {
-                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                            "description": "Your own identifier for this item. Unique within its kind.",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "pattern": "\\S",
+                            "description": "The name of a declared feature, matched trimmed, inner spaces collapsed and case-insensitively.",
                             "type": "string"
                           },
                           "limit": {
@@ -245,20 +245,16 @@
           {
             "type": "object",
             "required": [
-              "id",
               "name",
               "type",
               "packs"
             ],
             "properties": {
-              "id": {
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                "description": "Your own identifier for this item. Unique within its kind.",
-                "type": "string"
-              },
               "name": {
                 "minLength": 1,
                 "maxLength": 200,
+                "pattern": "\\S",
+                "description": "The product's identity — there is no product `id`. Unique per account and mode across every product type, compared trimmed, inner spaces collapsed and case-insensitively (`AI tokens` and ` ai  TOKENS ` are the same product). Renaming a product declares a new one and archives the old one at the push. Runtime calls reference the product by this name.",
                 "type": "string"
               },
               "description": {
@@ -287,20 +283,16 @@
                 "items": {
                   "type": "object",
                   "required": [
-                    "id",
-                    "label",
+                    "name",
                     "credits",
                     "price"
                   ],
                   "properties": {
-                    "id": {
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                      "description": "Your own identifier for this item. Unique within its kind.",
-                      "type": "string"
-                    },
-                    "label": {
+                    "name": {
                       "minLength": 1,
                       "maxLength": 200,
+                      "pattern": "\\S",
+                      "description": "The pack's identity inside its credits product, and its displayed label — there is no pack `id` nor `label`. Unique per product, compared trimmed, inner spaces collapsed and case-insensitively. Renaming a pack declares a new one and deactivates the old one at the push. `credits.buy` takes this name as `pack`.",
                       "type": "string"
                     },
                     "description": {
@@ -355,21 +347,17 @@
           {
             "type": "object",
             "required": [
-              "id",
               "name",
               "type",
               "price",
               "devices"
             ],
             "properties": {
-              "id": {
-                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
-                "description": "Your own identifier for this item. Unique within its kind.",
-                "type": "string"
-              },
               "name": {
                 "minLength": 1,
                 "maxLength": 200,
+                "pattern": "\\S",
+                "description": "The product's identity — there is no product `id`. Unique per account and mode across every product type, compared trimmed, inner spaces collapsed and case-insensitively (`AI tokens` and ` ai  TOKENS ` are the same product). Renaming a product declares a new one and archives the old one at the push. Runtime calls reference the product by this name.",
                 "type": "string"
               },
               "description": {
