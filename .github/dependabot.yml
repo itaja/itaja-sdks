@@ -1,0 +1,68 @@
+version: 2
+
+# One entry per SDK ecosystem, plus the workflows. Weekly on Monday morning
+# (Porto-Novo time, same slot as itaja/itaja-services), grouped by dependency
+# type so a routine week stays a handful of reviewable PRs. Releases are
+# tag-triggered, so merging one of these PRs never publishes a package.
+updates:
+  # Node SDK (pnpm, packages/node/pnpm-lock.yaml).
+  - package-ecosystem: "npm"
+    directory: "/packages/node"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Porto-Novo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "node"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
+  # Python SDK (uv, packages/python/uv.lock).
+  - package-ecosystem: "uv"
+    directory: "/packages/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Porto-Novo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
+  # Laravel SDK (composer.json at the root; no lockfile, so these PRs move the
+  # declared ranges themselves).
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Porto-Novo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "php"
+
+  # Pinned GitHub Actions versions (supply-chain surface of the release jobs).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Porto-Novo"
+    labels:
+      - "dependencies"
+      - "ci"
