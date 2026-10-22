@@ -28,7 +28,7 @@ jobs:
         working-directory: packages/node
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: packages/node/package.json
       - uses: actions/setup-node@v4

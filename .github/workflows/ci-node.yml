@@ -23,7 +23,7 @@ jobs:
         node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: packages/node/package.json
       # pnpm 11 itself needs Node >= 22.13: install and build with 22…
