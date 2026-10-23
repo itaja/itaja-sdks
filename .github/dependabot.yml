@@ -22,6 +22,13 @@ updates:
         dependency-type: "production"
       development-dependencies:
         dependency-type: "development"
+    ignore:
+      # openapi-typescript (the `generate` script) needs the TypeScript compiler
+      # API, which TypeScript 7 (native port) does not expose: the Node CI job
+      # fails with "createKeywordTypeNode of undefined". Revisit once
+      # openapi-typescript supports TS 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # Python SDK (uv, packages/python/uv.lock).
   - package-ecosystem: "uv"
