@@ -80,7 +80,7 @@ export interface WebhookResult {
 
 /** The framework-free core: a raw body and headers in, a status out. */
 export async function processWebhook(
-  input: { payload: string; headers: Headers | Record<string, string | string[] | undefined> },
+  input: { payload: string | Uint8Array; headers: Headers | Record<string, string | string[] | undefined> },
   options: WebhookHandlerOptions,
 ): Promise<WebhookResult> {
   let event: AnyItajaEvent;
@@ -137,7 +137,7 @@ export function createWebhookHandler(options: WebhookHandlerOptions): (request: 
   const resolved = { ...options, dedupe: options.dedupe ?? memoryDedupeStore() };
   return async (request) => {
     if (request.method !== "POST") return json(405, { received: false, error: "Method not allowed" });
-    const result = await processWebhook({ payload: await request.text(), headers: request.headers }, resolved);
+    const result = await processWebhook({ payload: new Uint8Array(await request.arrayBuffer()), headers: request.headers }, resolved);
     return json(result.status, { received: result.status === 200, outcome: result.outcome });
   };
 }
@@ -170,10 +170,10 @@ export function toNodeHandler(
   };
 }
 
-async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<string> {
-  // `express.raw()` already read it into a Buffer.
-  if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
-  if (typeof req.body === "string") return req.body;
+async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<Uint8Array<ArrayBuffer>> {
+  // `express.raw()` already read it into a Buffer. The bytes stay bytes: the signature covers them as received.
+  if (Buffer.isBuffer(req.body)) return new Uint8Array(req.body);
+  if (typeof req.body === "string") return new Uint8Array(Buffer.from(req.body, "utf8"));
   if (req.body !== undefined && req.body !== null && typeof req.body === "object") {
     throw new ItajaSignatureError({
       message:
@@ -184,7 +184,7 @@ async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<s
   }
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  return Buffer.concat(chunks).toString("utf8");
+  return new Uint8Array(Buffer.concat(chunks));
 }
 
 function json(status: number, body: unknown): Response {

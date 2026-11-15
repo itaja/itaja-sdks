@@ -2,21 +2,33 @@
  * Outbound webhooks: what Itaja sends, how it is signed, and how the SDK checks
  * it (ADR 0015 D6).
  *
- * Signature (`docs/api-reference.md`, *Webhooks*):
+ * Itaja signs with Standard Webhooks (https://www.standardwebhooks.com), and
+ * with nothing else:
  *
- *     x-itaja-timestamp: <unix seconds>
- *     x-itaja-signature: v1,<base64 HMAC-SHA256(secret, "<timestamp>.<raw body>")>[,<more>]
+ *     webhook-id:        <message id, the same on every retry of the event>
+ *     webhook-timestamp: <unix seconds>
+ *     webhook-signature: v1,<base64>[ v1,<base64>]
  *
- * Several signatures may follow `v1,` while a secret is rotated: one match is
- * enough. The check runs on the **raw** body, in constant time, and refuses a
- * timestamp more than `toleranceSeconds` (default 300) from now.
+ *     signature = base64(HMAC-SHA256(key, "<webhook-id>.<webhook-timestamp>.<raw body>"))
+ *
+ * The key is the secret without its `whsec_` prefix, base64-decoded. A legacy
+ * `whsec_<48 hex>` secret needs no rotation: hex is valid base64, so it decodes
+ * to 36 bytes like in any `standardwebhooks` library. A secret that is not
+ * canonical base64 is used as its UTF-8 bytes, which is what the emitter does.
+ *
+ * Several space-separated entries arrive while a secret is rotated: one match
+ * is enough, and an entry of another version than `v1` is skipped. The check
+ * runs on the **raw** body, in constant time, and refuses a timestamp more than
+ * `toleranceSeconds` (default 300) from now, in either direction.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { ItajaSignatureError } from "./errors.js";
 
-export const SIGNATURE_HEADER = "x-itaja-signature";
-export const TIMESTAMP_HEADER = "x-itaja-timestamp";
+export const ID_HEADER = "webhook-id";
+export const TIMESTAMP_HEADER = "webhook-timestamp";
+export const SIGNATURE_HEADER = "webhook-signature";
 export const SIGNATURE_VERSION = "v1";
+export const SECRET_PREFIX = "whsec_";
 export const DEFAULT_TOLERANCE_SECONDS = 300;
 
 // ── Event payloads (the `data` of each topic, as documented) ────────────────
@@ -159,7 +171,10 @@ export type AnyItajaEvent = { [T in EventType]: ItajaEvent<T> }[EventType] | Ita
 export interface VerifyInput {
   /** The body exactly as received — a re-serialised JSON fails, by design. */
   payload: string | Uint8Array;
-  /** Request headers (any casing), or a `Headers` object. */
+  /**
+   * Request headers (any casing), or a `Headers` object. `webhook-id`,
+   * `webhook-timestamp` and `webhook-signature` are read from it.
+   */
   headers: Headers | Record<string, string | string[] | undefined>;
   secret: string;
   toleranceSeconds?: number;
@@ -168,17 +183,30 @@ export interface VerifyInput {
 }
 
 /**
- * Checks a delivery and returns its event. Throws `ItajaSignatureError` when
- * the signature is missing, wrong, or older than the tolerance.
+ * Checks a delivery and returns its event. Throws `ItajaSignatureError`, whose
+ * `code` says why:
+ *
+ * | `code` | The delivery… |
+ * |---|---|
+ * | `WEBHOOK_SECRET_MISSING` | cannot be checked: no secret was given |
+ * | `SIGNATURE_MISSING` | lacks `webhook-id`, `webhook-timestamp` or `webhook-signature` |
+ * | `TIMESTAMP_INVALID` | has a `webhook-timestamp` that is not unix seconds |
+ * | `TIMESTAMP_OUT_OF_TOLERANCE` | is older or newer than the tolerance |
+ * | `SIGNATURE_SCHEME_UNSUPPORTED` | has no `v1,<base64>` entry in `webhook-signature` |
+ * | `SIGNATURE_MISMATCH` | carries no signature made with this secret |
+ * | `PAYLOAD_INVALID` | is signed, but its body is not an Itaja event |
  */
 export function constructEvent(input: VerifyInput): AnyItajaEvent {
-  const body = typeof input.payload === "string" ? input.payload : Buffer.from(input.payload).toString("utf8");
-  const signatureHeader = readHeader(input.headers, SIGNATURE_HEADER);
+  const body = typeof input.payload === "string" ? Buffer.from(input.payload, "utf8") : Buffer.from(input.payload);
+  const id = readHeader(input.headers, ID_HEADER);
   const timestamp = readHeader(input.headers, TIMESTAMP_HEADER);
+  const signatureHeader = readHeader(input.headers, SIGNATURE_HEADER);
 
   if (!input.secret) throw signatureError("No webhook secret. Set ITAJA_WEBHOOK_SECRET, or pass webhookSecret.", "WEBHOOK_SECRET_MISSING");
-  if (!signatureHeader || !timestamp) throw signatureError("Missing x-itaja-signature or x-itaja-timestamp header.", "SIGNATURE_MISSING");
-  if (!/^\d+$/.test(timestamp)) throw signatureError("x-itaja-timestamp is not a unix time.", "TIMESTAMP_INVALID");
+  if (!id || !timestamp || !signatureHeader) {
+    throw signatureError("Missing webhook-id, webhook-timestamp or webhook-signature header.", "SIGNATURE_MISSING");
+  }
+  if (!/^[0-9]+$/.test(timestamp)) throw signatureError("webhook-timestamp is not a unix time.", "TIMESTAMP_INVALID");
 
   const tolerance = input.toleranceSeconds ?? DEFAULT_TOLERANCE_SECONDS;
   const now = input.now ?? Math.floor(Date.now() / 1000);
@@ -186,21 +214,23 @@ export function constructEvent(input: VerifyInput): AnyItajaEvent {
     throw signatureError(`Webhook timestamp is more than ${tolerance}s away from now.`, "TIMESTAMP_OUT_OF_TOLERANCE");
   }
 
-  const [version, ...signatures] = signatureHeader.split(",").map((part) => part.trim());
-  if (version !== SIGNATURE_VERSION || signatures.length === 0) {
-    throw signatureError("Unsupported signature scheme.", "SIGNATURE_SCHEME_UNSUPPORTED");
+  const candidates = v1Signatures(signatureHeader);
+  if (candidates.length === 0) {
+    throw signatureError("webhook-signature carries no v1,<base64> entry.", "SIGNATURE_SCHEME_UNSUPPORTED");
   }
 
-  const expected = createHmac("sha256", input.secret).update(`${timestamp}.${body}`, "utf8").digest();
-  const match = signatures.some((candidate) => {
+  const expected = digest(input.secret, id, timestamp, body);
+  let match = false;
+  // No early exit: every candidate is compared, in constant time.
+  for (const candidate of candidates) {
     const given = Buffer.from(candidate, "base64");
-    return given.length === expected.length && timingSafeEqual(given, expected);
-  });
+    if (given.length === expected.length && timingSafeEqual(given, expected)) match = true;
+  }
   if (!match) throw signatureError("Webhook signature does not match.", "SIGNATURE_MISMATCH");
 
   let event: unknown;
   try {
-    event = JSON.parse(body);
+    event = JSON.parse(body.toString("utf8"));
   } catch {
     throw signatureError("Webhook body is not JSON.", "PAYLOAD_INVALID");
   }
@@ -208,14 +238,59 @@ export function constructEvent(input: VerifyInput): AnyItajaEvent {
   return event as AnyItajaEvent;
 }
 
+export interface SignInput {
+  /** The body exactly as it will be sent. */
+  payload: string | Uint8Array;
+  secret: string;
+  /** `webhook-id`. Defaults to a fresh `msg_<uuid>`; a retry of the same event must reuse it. */
+  id?: string;
+  /** Unix seconds. Defaults to now. */
+  timestamp?: number;
+}
+
 /**
  * Signs a payload the way Itaja does — for your tests and for `itaja trigger`.
- * Returns the two headers to send.
+ * Returns the three headers to send: `webhook-id`, `webhook-timestamp`,
+ * `webhook-signature`.
  */
-export function signPayload(input: { payload: string; secret: string; timestamp?: number }): Record<string, string> {
+export function signPayload(input: SignInput): Record<string, string> {
+  const id = input.id ?? `msg_${randomUUID()}`;
   const timestamp = String(input.timestamp ?? Math.floor(Date.now() / 1000));
-  const digest = createHmac("sha256", input.secret).update(`${timestamp}.${input.payload}`, "utf8").digest("base64");
-  return { [SIGNATURE_HEADER]: `${SIGNATURE_VERSION},${digest}`, [TIMESTAMP_HEADER]: timestamp };
+  const body = typeof input.payload === "string" ? Buffer.from(input.payload, "utf8") : Buffer.from(input.payload);
+  return {
+    [ID_HEADER]: id,
+    [TIMESTAMP_HEADER]: timestamp,
+    [SIGNATURE_HEADER]: `${SIGNATURE_VERSION},${digest(input.secret, id, timestamp, body).toString("base64")}`,
+  };
+}
+
+/**
+ * The HMAC key of a secret: what follows `whsec_`, base64-decoded. Text that is
+ * not canonical base64 (it would not encode back to itself) is used as its
+ * UTF-8 bytes — the emitter derives the key the same way.
+ */
+function secretKey(secret: string): Buffer {
+  const text = secret.startsWith(SECRET_PREFIX) ? secret.slice(SECRET_PREFIX.length) : secret;
+  if (/^[A-Za-z0-9+/]*={0,2}$/.test(text) && text.length % 4 === 0) {
+    const decoded = Buffer.from(text, "base64");
+    if (decoded.length > 0 && decoded.toString("base64") === text) return decoded;
+  }
+  return Buffer.from(text, "utf8");
+}
+
+/** HMAC-SHA256 over `<id>.<timestamp>.<raw body>`: the body bytes go in untouched. */
+function digest(secret: string, id: string, timestamp: string, body: Buffer): Buffer {
+  return createHmac("sha256", secretKey(secret)).update(`${id}.${timestamp}.`, "utf8").update(body).digest();
+}
+
+/** The base64 part of every `v1,<base64>` entry of a space-separated header. */
+function v1Signatures(header: string): string[] {
+  const signatures: string[] = [];
+  for (const entry of header.split(/\s+/)) {
+    const [version, signature] = entry.split(",");
+    if (version === SIGNATURE_VERSION && signature) signatures.push(signature);
+  }
+  return signatures;
 }
 
 function isEnvelope(value: unknown): value is { id: string; type: string; data: unknown } {

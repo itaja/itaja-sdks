@@ -113,6 +113,25 @@ One route receives Itaja's events. It checks the signature, ignores a delivery i
 already handled, ignores events of the other mode, and answers `500` when your
 handler throws so Itaja delivers again.
 
+#### Signature: Standard Webhooks
+
+Itaja signs every delivery with [Standard Webhooks](https://www.standardwebhooks.com),
+and with nothing else:
+
+```
+webhook-id:        <message id, the same on every retry>
+webhook-timestamp: <unix seconds>
+webhook-signature: v1,<base64>[ v1,<base64>]   # space-separated during a secret rotation
+
+signature = base64(HMAC-SHA256(key, "<webhook-id>.<webhook-timestamp>.<raw body>"))
+key       = base64-decoded part of the secret after `whsec_`
+```
+
+Your existing `whsec_…` secret keeps working: no rotation is needed. Any official
+Standard Webhooks library verifies Itaja's deliveries too. The SDK refuses a
+delivery more than 5 minutes away from now, and the removed
+`x-itaja-signature` / `x-itaja-timestamp` headers are no longer read.
+
 ```ts
 // Next.js — app/itaja/webhook/route.ts
 import { itaja } from "@/itaja.config";
@@ -345,8 +364,8 @@ pnpm generate    # regenerate src/generated/openapi.ts from spec/openapi.json
 ```
 
 `spec/openapi.json` and `spec/catalog.schema.json` (repository root) are copies of
-the developer API's exported documents. `spec/signature-vectors.json` was signed
-by the API's own `signOutboundWebhook`. The e2e suite writes
+the developer API's exported documents. `spec/signature-vectors.json` holds
+Standard Webhooks deliveries, checked against the official `standardwebhooks` package. The e2e suite writes
 `tests/e2e/__fixtures__/catalog-push-walk.json` and compares every later run with it.
 
 ## License

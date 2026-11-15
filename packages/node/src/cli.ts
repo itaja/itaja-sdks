@@ -174,9 +174,10 @@ async function main(argv: string[]): Promise<number> {
       const data = typeof flags.data === "string" ? (JSON.parse(flags.data) as Record<string, unknown>) : SAMPLES[type];
       if (!data) throw new Error(`No sample for "${type}": pass --data '<json>'. Samples: ${Object.keys(SAMPLES).join(", ")}.`);
       const mode = flags.mode === "live" ? "live" : "sandbox";
-      const payload = JSON.stringify({ id: `itaja_evt_trigger_${randomUUID()}`, type, apiVersion: "v1", mode, createdAt: new Date().toISOString(), data });
+      const id = `itaja_evt_trigger_${randomUUID()}`;
+      const payload = JSON.stringify({ id, type, apiVersion: "v1", mode, createdAt: new Date().toISOString(), data });
       const response = await axios.post(url, payload, {
-        headers: { "content-type": "application/json", ...signPayload({ payload, secret }) },
+        headers: { "content-type": "application/json", ...signPayload({ payload, secret, id }) },
         validateStatus: () => true,
         transformRequest: [(body: string) => body],
       });

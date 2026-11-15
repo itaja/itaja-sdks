@@ -96,6 +96,25 @@ The key's prefix picks the mode: `itjs_` is sandbox, `itjp_` is live.
 signature on the raw body, ignores a delivery it already handled, ignores events of
 the other mode, and answers `500` when a listener throws so Itaja delivers again.
 
+#### Signature: Standard Webhooks
+
+Itaja signs every delivery with [Standard Webhooks](https://www.standardwebhooks.com),
+and with nothing else:
+
+```
+webhook-id:        <message id, the same on every retry>
+webhook-timestamp: <unix seconds>
+webhook-signature: v1,<base64>[ v1,<base64>]   # space-separated during a secret rotation
+
+signature = base64(HMAC-SHA256(key, "<webhook-id>.<webhook-timestamp>.<raw body>"))
+key       = base64-decoded part of the secret after `whsec_`
+```
+
+Your existing `whsec_…` secret keeps working: no rotation is needed. Any official
+Standard Webhooks library verifies Itaja's deliveries too. The SDK refuses a
+delivery more than 5 minutes away from now, and the removed
+`x-itaja-signature` / `x-itaja-timestamp` headers are no longer read.
+
 Laravel's CSRF protection is lifted on that one route. To mount it yourself, set
 `itaja.webhook.path` to `null` and point a route at `Itaja\Laravel\Http\WebhookController`.
 
@@ -312,8 +331,9 @@ composer test
 
 `spec/catalog.schema.json` and `spec/signature-vectors.json` (repository root) are shared
 with every Itaja SDK: this package builds, field for field, the catalogue the TypeScript SDK
-builds (`spec/conformance/reference-catalog.json`), and accepts every webhook the backend's
-own signer produced.
+builds (`spec/conformance/reference-catalog.json`), and accepts every Standard Webhooks
+delivery of the shared vectors, as the official `standard-webhooks/standard-webhooks`
+package does.
 
 ## License
 

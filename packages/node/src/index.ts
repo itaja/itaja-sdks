@@ -28,11 +28,12 @@ export type {
 export {
   constructEvent,
   signPayload,
+  ID_HEADER,
   SIGNATURE_HEADER,
   TIMESTAMP_HEADER,
   DEFAULT_TOLERANCE_SECONDS,
 } from "./webhooks.js";
-export type { AnyItajaEvent, EventDataMap, EventType, ItajaEvent, VerifyInput } from "./webhooks.js";
+export type { AnyItajaEvent, EventDataMap, EventType, ItajaEvent, SignInput, VerifyInput } from "./webhooks.js";
 
 export { createWebhookHandler, memoryDedupeStore, processWebhook, toNodeHandler } from "./handler.js";
 export type { DedupeStore, EventHandler, EventHandlers, WebhookHandlerOptions, WebhookOutcome, WebhookResult } from "./handler.js";

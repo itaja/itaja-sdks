@@ -7,10 +7,10 @@ webhook route, **react** to typed events — as fixed by
 
 | Package | Registry | Folder | Status |
 |---|---|---|---|
-| `@itaja/node` | npm | [`packages/node`](packages/node) | 0.3.0 |
-| `itaja` | PyPI | [`packages/python`](packages/python) | 0.3.0 |
+| `@itaja/node` | npm | [`packages/node`](packages/node) | 0.4.0 |
+| `itaja` | PyPI | [`packages/python`](packages/python) | 0.4.0 |
 | `itaja` | pub.dev | `packages/dart` | planned |
-| `itaja/itaja-laravel` | Packagist | [`packages/laravel`](packages/laravel) | 0.3.0 |
+| `itaja/itaja-laravel` | Packagist | [`packages/laravel`](packages/laravel) | 0.4.0 |
 
 ## Shared contracts — `spec/`
 
@@ -20,7 +20,7 @@ Written once, read by every SDK. Never edit a copy inside a package.
 |---|---|---|
 | `openapi.json` | The developer API | `itaja-services` → `backend/apps/dev-api/openapi.json` |
 | `catalog.schema.json` | The canonical catalogue `push` sends | `itaja-services` → `backend/apps/dev-api/catalog.schema.json` |
-| `signature-vectors.json` | Webhook deliveries signed by the backend's own `signOutboundWebhook` | generated from `itaja-services` |
+| `signature-vectors.json` | [Standard Webhooks](https://www.standardwebhooks.com) deliveries: base64, legacy `whsec_<48 hex>` and non-base64 secrets, and a rotation | `node spec/generate-signature-vectors.mjs`; checked against the official `standardwebhooks` libraries |
 
 Every SDK must accept every vector, and build a catalogue document the schema
 validates.
