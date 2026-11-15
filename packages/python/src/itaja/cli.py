@@ -196,9 +196,10 @@ def main(argv: list[str] | None = None) -> int:
             if not isinstance(data, dict):
                 print(f"No sample for \"{args.type}\": pass --data '{{...}}'.", file=sys.stderr)
                 return 1
+            event_id = f"itaja_evt_trigger_{uuid.uuid4()}"
             payload = json.dumps(
                 {
-                    "id": f"itaja_evt_trigger_{uuid.uuid4()}",
+                    "id": event_id,
                     "type": args.type,
                     "apiVersion": "v1",
                     "mode": args.mode,
@@ -211,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
             response = httpx.post(
                 args.url,
                 content=payload.encode(),
-                headers={"content-type": "application/json", **sign_payload(payload, secret)},
+                headers={"content-type": "application/json", **sign_payload(payload, secret, id=event_id)},
             )
             print(f"{args.type} → {args.url}: HTTP {response.status_code} {response.text}")
             return 0 if response.is_success else 1

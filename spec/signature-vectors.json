@@ -1,24 +1,57 @@
 {
-  "secret": "whsec_conformance_not_a_real_secret",
-  "generatedBy": "itaja-services backend/packages/application signOutboundWebhook @ 5e12c5a1",
+  "scheme": "standard-webhooks",
+  "signedContent": "<webhook-id>.<webhook-timestamp>.<raw body>",
+  "headers": {
+    "id": "webhook-id",
+    "timestamp": "webhook-timestamp",
+    "signature": "webhook-signature"
+  },
+  "generatedBy": "spec/generate-signature-vectors.mjs",
   "vectors": [
     {
-      "name": "checkout.paid",
+      "name": "base64 secret: checkout.paid",
+      "kind": "base64-secret",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "id": "itaja_evt_txn_1",
       "timestamp": "1760500000",
       "body": "{\"id\":\"itaja_evt_txn_1\",\"type\":\"checkout.paid\",\"apiVersion\":\"v1\",\"mode\":\"live\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"checkoutId\":\"chk_1\",\"productId\":null,\"transactionId\":\"txn_1\",\"amount\":5000,\"currency\":\"XOF\",\"paidAt\":\"2026-10-15T10:00:00.000Z\"}}",
-      "signature": "v1,/DKF56v9CyvZGb/uweNHNEWG/Dv46EMitfFkqhbN+Ok="
+      "signature": "v1,PZt19Bv9pE9IRk5BajkbJjKTruJWxEaNJC8PeSvuTWQ="
     },
     {
-      "name": "unicode body",
+      "name": "base64 secret: unicode body",
+      "kind": "base64-secret",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "id": "msg_conformance_unicode",
       "timestamp": "1760500001",
       "body": "{\"id\":\"itaja_evt_2\",\"type\":\"license.activated\",\"apiVersion\":\"v1\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_1\",\"keyId\":\"key_1\",\"key\":\"ITJ-••••-••••-ABCD\",\"instanceId\":\"i1\",\"label\":\"Ordinateur d'Awa — été\",\"activationsUsed\":1,\"activationsMax\":3,\"expiresAt\":null,\"deviceFingerprintHash\":\"sha256:x\"}}",
-      "signature": "v1,jXPirOyIT6GfvUAs/SuQb0Z4q49SRkTY56H3t1X8iNg="
+      "signature": "v1,2j8Xfjh/4CT9VbXWBxbyMHm08ieFeeAzQo+TgtFLQHg="
     },
     {
-      "name": "sandbox credits.low",
+      "name": "legacy whsec_<48 hex> secret: sandbox credits.low",
+      "kind": "legacy-hex-secret",
+      "secret": "whsec_0123456789abcdef0123456789abcdef0123456789abcdef",
+      "id": "itaja_evt_3",
       "timestamp": "1760500002",
       "body": "{\"id\":\"itaja_evt_3\",\"type\":\"credits.low\",\"apiVersion\":\"v1\",\"mode\":\"sandbox\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_2\",\"walletId\":\"cwl_1\",\"customerId\":\"cus_1\",\"balance\":10,\"threshold\":20,\"idempotencyKey\":\"k\"}}",
-      "signature": "v1,exv9vPoD2zNhFG4Kg10qKC/mrN0Dt2nmmj1Cm3WQgJ0="
+      "signature": "v1,bMvYXErftKkQ4OkAsielelAyGAmI0+MajeS885R2alc="
+    },
+    {
+      "name": "rotation: two signatures, the receiver holds the previous secret",
+      "kind": "rotation",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "id": "itaja_evt_4",
+      "timestamp": "1760500003",
+      "body": "{\"id\":\"itaja_evt_4\",\"type\":\"invoice.paid\",\"apiVersion\":\"v1\",\"mode\":\"live\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_3\",\"contractId\":\"sub_1\",\"customerId\":\"cus_1\",\"planId\":\"pln_1\",\"invoiceId\":\"inv_1\",\"invoiceNumber\":7,\"amount\":15000,\"currency\":\"XOF\",\"periodStart\":\"2026-10-15T10:00:00.000Z\",\"periodEnd\":\"2026-11-15T10:00:00.000Z\",\"dueDate\":\"2026-10-15T10:00:00.000Z\",\"paidAt\":\"2026-10-15T10:00:00.000Z\"}}",
+      "signature": "v1,co0Lrwk/yoVYzgxqPoiiEnMzjqSJGCNoVSbw9mZE3rE= v1,qQfWPWlsczTAWA+BmPUuOWRhzhJ3PqHN7gXrxDP7l6I="
+    },
+    {
+      "name": "non-base64 secret: UTF-8 fallback",
+      "kind": "utf8-fallback-secret",
+      "secret": "whsec_conformance_not_a_real_secret",
+      "id": "itaja_evt_5",
+      "timestamp": "1760500004",
+      "body": "{\"id\":\"itaja_evt_5\",\"type\":\"license.revoked\",\"apiVersion\":\"v1\",\"createdAt\":\"2026-10-15T10:00:00.000Z\",\"data\":{\"productId\":\"prd_1\",\"keyId\":\"key_1\",\"key\":\"ITJ-••••-••••-ABCD\",\"previousStatus\":\"ACTIVE\",\"reason\":null}}",
+      "signature": "v1,cv55qtqXB3nm/jo3X5VhsHu5352e/Fhsayypfq6IFKA="
     }
   ]
 }

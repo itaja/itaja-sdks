@@ -36,8 +36,9 @@ class TriggerCommand extends Command
             return self::FAILURE;
         }
         $url = $this->option('url') ?: url((string) config('itaja.webhook.path', 'itaja/webhook'));
+        $eventId = 'itaja_evt_trigger_'.Str::uuid();
         $payload = (string) json_encode([
-            'id' => 'itaja_evt_trigger_'.Str::uuid(),
+            'id' => $eventId,
             'type' => $type,
             'apiVersion' => 'v1',
             'mode' => $this->option('mode') === 'live' ? 'live' : 'sandbox',
@@ -45,7 +46,7 @@ class TriggerCommand extends Command
             'data' => $data,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $response = $http->withHeaders(Signature::sign($payload, $secret))->withBody($payload, 'application/json')->post($url);
+        $response = $http->withHeaders(Signature::sign($payload, $secret, id: $eventId))->withBody($payload, 'application/json')->post($url);
         $this->line("{$type} → {$url}: HTTP {$response->status()} {$response->body()}");
 
         return $response->successful() ? self::SUCCESS : self::FAILURE;
